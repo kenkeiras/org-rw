@@ -23,7 +23,7 @@ class Dom:
             test_case.assertEqual(len(doc_props), len(self.props))
 
             for i, prop in enumerate(self.props):
-                test_case.assertEqual(doc_props[i].name, prop[0])
+                test_case.assertEqual(doc_props[i].key, prop[0])
                 test_case.assertEqual(doc_props[i].value, prop[1])
 
         # @TODO: Check properties
@@ -58,7 +58,7 @@ class HL:
             test_case.assertEqual(len(doc_props), len(self.props))
 
             for i, prop in enumerate(self.props):
-                test_case.assertEqual(doc_props[i].name, prop[0])
+                test_case.assertEqual(doc_props[i].key, prop[0])
                 if isinstance(prop[1], datetime):
                     test_case.assertEqual(
                         timestamp_to_datetime(doc_props[i].value), prop[1])
