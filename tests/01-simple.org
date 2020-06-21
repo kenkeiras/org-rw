@@ -1,0 +1,25 @@
+#+TITLE: 01-Simple
+#+DESCRIPTION: Simple org file
+#+TODO: TODO(t) PAUSED(p) |  DONE(d)
+
+
+* First level
+  :PROPERTIES:
+  :ID:       01-simple-first-level-id
+  :CREATED:  [2020-01-01 Wed 01:01]
+  :END:
+  First level content
+
+** Second level
+   :PROPERTIES:
+   :ID:       01-simple-second-level-id
+   :END:
+
+   Second level content
+
+*** Third level
+    :PROPERTIES:
+    :ID:       01-simple-third-level-id
+    :END:
+
+    Third level content
