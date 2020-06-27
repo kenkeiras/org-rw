@@ -55,12 +55,14 @@ INACTIVE_TIME_STAMP_RE = re.compile(r'\[{}\]'.format(BASE_TIME_STAMP_RE))
 #                       r'(?P<end_year>\d{4})-(?P<end_month>\d{2})-(?P<end_day>\d{2}) (?P<end_dow>[^ ]+)((?P<end_hour>\d{1,2}):(?P<end_minute>\d{1,2}))?')
 
 Headline = collections.namedtuple('Headline', ('start_line', 'depth',
-                                               'keyword_start', 'keyword',
+                                               'orig',
+                                               'properties', 'keywords',
                                                'priority_start', 'priority',
                                                'title_start', 'title',
                                                'tags_start', 'tags',
-                                               'content',
+                                               'contents',
                                                'children',
+                                               'structural',
 ))
 
 RawLine = collections.namedtuple('RawLine', ('linenum', 'line'))
@@ -107,9 +109,43 @@ def timestamp_to_string(ts):
     else:
         return '[{}]'.format(base)
 
+def parse_headline(hl) -> Headline:
+    # 'linenum': linenum,
+    # 'orig': match,
+    # 'title': match.group('line'),
+    # 'contents': [],
+    # 'children': [],
+    # 'keywords': [],
+    # 'properties': [],
+    # 'structural': [],
+    # HEADLINE_RE = re.compile(r'^(?P<stars>\*+) (?P<spacing>\s*)(?P<line>.*)$')
+    stars = hl['orig'].group('stars')
+    depth = len(stars)
+
+    # TODO: Parse line for priority, cookies and tags
+    line = hl['orig'].group('line')
+    title = line.strip()
+
+    return Headline(start_line=hl['linenum'],
+                    depth=depth,
+                    orig=hl['orig'],
+                    title=title,
+                    contents=hl['contents'],
+                    children=[parse_headline(child) for child in hl['children']],
+                    keywords=hl['keywords'],
+                    properties=hl['properties'],
+                    structural=hl['structural'],
+                    title_start=None,
+                    priority=None,
+                    priority_start=None,
+                    tags_start=None,
+                    tags=None,
+    )
+
+
 class OrgDom:
     def __init__(self, headlines, keywords, contents):
-        self.headlines: List[Headline] = headlines
+        self.headlines: List[Headline] = list(map(parse_headline, headlines))
         self.keywords: List[Property] = keywords
         self.contents: List[RawLine] = contents
 
@@ -162,23 +198,23 @@ class OrgDom:
         return (structural[0], structural[1])
 
     def dump_headline(self, headline):
-        yield headline['orig'].group('stars') + ' ' + headline['orig'].group('spacing') + headline['orig'].group('line')
+        yield '*' * headline.depth + ' ' + headline.orig.group('spacing') + headline.title
 
         lines = []
         KW_T = 0
         CONTENT_T = 1
         PROPERTIES_T = 2
         STRUCTURAL_T = 3
-        for keyword in headline['keywords']:
+        for keyword in headline.keywords:
             lines.append((KW_T, self.dump_kw(keyword)))
 
-        for content in headline['contents']:
+        for content in headline.contents:
             lines.append((CONTENT_T, self.dump_contents(content)))
 
-        for prop in headline['properties']:
+        for prop in headline.properties:
             lines.append((PROPERTIES_T, self.dump_property(prop)))
 
-        for struct in headline['structural']:
+        for struct in headline.structural:
             lines.append((STRUCTURAL_T, self.dump_structural(struct)))
 
         lines = sorted(lines, key=lambda x: x[1][0])
@@ -204,7 +240,7 @@ class OrgDom:
 
         yield from structured_lines
 
-        for child in headline['children']:
+        for child in headline.children:
             yield from self.dump_headline(child)
 
     def dump(self):
@@ -235,7 +271,7 @@ class OrgDomReader:
     def add_headline(self, linenum: int, match: re.Match) -> int:
         # Position reader on the proper headline
         stars = match.group('stars')
-        depth = len(stars) - 1
+        depth = len(stars)
 
         headline = {
             'linenum': linenum,
@@ -248,13 +284,13 @@ class OrgDomReader:
             'structural': [],
         }
 
-        while (depth - 1) > len(self.headline_hierarchy):
+        while (depth - 2) > len(self.headline_hierarchy):
             # Introduce structural headlines
             self.headline_hierarchy.append(None)
         while depth < len(self.headline_hierarchy):
             self.headline_hierarchy.pop()
 
-        if depth == 0:
+        if depth == 1:
             self.headlines.append(headline)
         else:
             self.headline_hierarchy[-1]['children'].append(headline)

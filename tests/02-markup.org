@@ -1,0 +1,21 @@
+#+TITLE: 02-Markup
+#+DESCRIPTION: Simple org file to test markup
+#+TODO: TODO(t) PAUSED(p) |  DONE(d)
+
+
+* First level
+  :PROPERTIES:
+  :ID:       02-markup-first-level-id
+  :CREATED:  [2020-01-01 Wed 01:01]
+  :END:
+  This is a *bold phrase*.
+
+  This is a =verbatim phrase=.
+
+  This is a /italic phrase/.
+
+  This is a +strike-through phrase+.
+
+  This is a _underlined phrase_.
+
+  This is a ~code phrase~.
