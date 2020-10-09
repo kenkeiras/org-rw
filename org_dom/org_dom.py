@@ -109,28 +109,187 @@ def timestamp_to_string(ts):
     else:
         return '[{}]'.format(base)
 
+
+class Line:
+    def __init__(self, linenum, contents):
+        self.linenum = linenum
+        self.contents = contents
+
+    def get_raw(self):
+        rawchunks = []
+        for chunk in self.contents:
+            if isinstance(chunk, str):
+                rawchunks.append(chunk)
+            else:
+                rawchunks.append(chunk.get_raw())
+        return ''.join(rawchunks) + '\n'
+
+class Text:
+    def __init__(self, contents):
+        self.contents = contents
+
+    def get_raw(self):
+        raw = ''.join(self.contents)
+        return raw
+
+class Bold:
+    def __init__(self, contents):
+        self.contents = contents
+
+    def get_raw(self):
+        raw = ''.join(self.contents)
+        return f"*{raw}*"
+
+class Code:
+    def __init__(self, contents):
+        self.contents = contents
+
+    def get_raw(self):
+        raw = ''.join(self.contents)
+        return f"~{raw}~"
+
+class Italic:
+    def __init__(self, contents):
+        self.contents = contents
+
+    def get_raw(self):
+        raw = ''.join(self.contents)
+        return f"/{raw}/"
+
+class Strike:
+    def __init__(self, contents):
+        self.contents = contents
+
+    def get_raw(self):
+        raw = ''.join(self.contents)
+        return f"+{raw}+"
+
+class Underlined:
+    def __init__(self, contents):
+        self.contents = contents
+
+    def get_raw(self):
+        raw = ''.join(self.contents)
+        return f"_{raw}_"
+
+class Verbatim:
+    def __init__(self, contents):
+        self.contents = contents
+
+    def get_raw(self):
+        raw = ''.join(self.contents)
+        return f"={raw}="
+
+
+def parse_contents(raw_contents:List[RawLine]):
+    NO_MODE = 0
+    BOLD_MODE = 1
+    CODE_MODE = 2
+    ITALIC_MODE = 3
+    STRIKE_MODE = 4
+    UNDERLINED_MODE = 5
+    VERBATIM_MODE = 6
+
+    MODE_CLASS = {
+        NO_MODE: Line,
+        BOLD_MODE: Bold,
+        CODE_MODE: Code,
+        ITALIC_MODE: Italic,
+        STRIKE_MODE: Strike,
+        UNDERLINED_MODE: Underlined,
+        VERBATIM_MODE: Verbatim,
+    }
+
+    mode = NO_MODE
+    escaped = False
+
+    chunk = []
+    inline = []
+    chunks = []
+
+    linenum = start_linenum = raw_contents[0].linenum
+    contents_buff = []
+    for line in raw_contents:
+        contents_buff.append(line.line)
+
+    contents = '\n'.join(contents_buff)
+
+    for c in contents:
+        if mode == NO_MODE:
+            if escaped:
+                chunk.append(c)
+                escaped = False
+
+            elif c == '\\':
+                escaped = True
+            elif c == '*':
+                mode = BOLD_MODE
+            elif c == '~':
+                mode = CODE_MODE
+            elif c == '/':
+                mode = ITALIC_MODE
+            elif c == '+':
+                mode = STRIKE_MODE
+            elif c == '_':
+                mode = UNDERLINED_MODE
+            elif c == '=':
+                mode = VERBATIM_MODE
+            elif c == '\n':
+                chunks.append(Line(linenum, inline + [Text(chunk)]))
+                chunk = []
+                inline = []
+            else:
+                chunk.append(c)
+
+            if mode != NO_MODE:
+                inline.append(Text([''.join(chunk)]))
+                chunk = []
+        else:
+            if escaped:
+                chunk.append(c)
+                escaped = False
+
+            was_mode = mode
+            if mode == BOLD_MODE and c == '*':
+                mode = NO_MODE
+            elif mode == CODE_MODE and c == '~':
+                mode = NO_MODE
+            elif mode == ITALIC_MODE and c == '/':
+                mode = NO_MODE
+            elif mode == STRIKE_MODE and c == '+':
+                mode = NO_MODE
+            elif mode == UNDERLINED_MODE and c == '_':
+                mode = NO_MODE
+            elif mode == VERBATIM_MODE and c == '=':
+                mode = NO_MODE
+            elif c == '\n':
+                raise NotImplementedError("[{} | {}]".format(c, chunk))
+            else:
+                chunk.append(c)
+
+            if mode == NO_MODE:
+                inline.append(MODE_CLASS[was_mode](''.join(chunk)))
+                chunk = []
+
+    assert(len(chunk) == 0)
+    assert(len(inline) == 0)
+
+    return chunks
+
 def parse_headline(hl) -> Headline:
-    # 'linenum': linenum,
-    # 'orig': match,
-    # 'title': match.group('line'),
-    # 'contents': [],
-    # 'children': [],
-    # 'keywords': [],
-    # 'properties': [],
-    # 'structural': [],
-    # HEADLINE_RE = re.compile(r'^(?P<stars>\*+) (?P<spacing>\s*)(?P<line>.*)$')
     stars = hl['orig'].group('stars')
     depth = len(stars)
 
     # TODO: Parse line for priority, cookies and tags
     line = hl['orig'].group('line')
     title = line.strip()
+    contents = parse_contents(hl['contents'])
 
     return Headline(start_line=hl['linenum'],
                     depth=depth,
                     orig=hl['orig'],
                     title=title,
-                    contents=hl['contents'],
+                    contents=contents,
                     children=[parse_headline(child) for child in hl['children']],
                     keywords=hl['keywords'],
                     properties=hl['properties'],
@@ -191,8 +350,11 @@ class OrgDom:
             value=value,
         ))
 
-    def dump_contents(self, raw: RawLine):
-        return (raw.linenum, raw.line)
+    def dump_contents(self, raw):
+        if isinstance(raw, RawLine):
+            return (raw.linenum, raw.line)
+        else:
+            return (raw.linenum, raw.get_raw())
 
     def dump_structural(self, structural: Tuple):
         return (structural[0], structural[1])
@@ -227,18 +389,21 @@ class OrgDom:
 
             if ltype == PROPERTIES_T and last_type not in (STRUCTURAL_T, PROPERTIES_T):
                 # No structural opening
-                structured_lines.append(' ' * content.index(':') + ':PROPERTIES:')
+                structured_lines.append(' ' * content.index(':') + ':PROPERTIES:\n')
                 logging.warning("Added structural: ".format(line[1][0], structured_lines[-1].strip()))
             elif ltype not in (STRUCTURAL_T, PROPERTIES_T) and last_type == PROPERTIES_T:
                 # No structural closing
                 last_line = lines[i - 1][1][1]
-                structured_lines.append(' ' * last_line.index(':') + ':END:')
+                structured_lines.append(' ' * last_line.index(':') + ':END:\n')
                 logging.warning("Added structural:{}: {}".format(line[1][0], structured_lines[-1].strip()))
+
+            elif ltype != CONTENT_T:
+                content = content + '\n'
 
             last_type = ltype
             structured_lines.append(content)
 
-        yield from structured_lines
+        yield ''.join(structured_lines)
 
         for child in headline.children:
             yield from self.dump_headline(child)
@@ -372,5 +537,7 @@ def load(f, environment=BASE_ENVIRONMENT, extra_cautious=False):
 
 
 def dumps(doc):
-    result = '\n'.join(doc.dump())
+    dump = list(doc.dump())
+    result = '\n'.join(dump)
+    print(result)
     return result

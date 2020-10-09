@@ -76,7 +76,6 @@ class TestSerde(unittest.TestCase):
                                   SPAN(""),
                                   SPAN("  This is a ", CODE("code phrase"),
                                        "."),
-                                  SPAN(""),
                               ])))
 
         ex.assert_matches(self, doc)

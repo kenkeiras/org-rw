@@ -1,4 +1,4 @@
-from .org_dom import Headline, RawLine
+from .org_dom import Headline, Line, RawLine
 
 
 def get_hl_raw_contents(doc: Headline) -> str:
@@ -7,11 +7,16 @@ def get_hl_raw_contents(doc: Headline) -> str:
     for content in doc.contents:
         lines.append(get_raw_contents(content))
 
-    return '\n'.join(lines)
+    raw = ''.join(lines)
+    return raw
 
 
 def get_rawline_contents(doc: RawLine) -> str:
     return doc.line
+
+
+def get_span_contents(doc: Line) -> str:
+    return doc.get_raw()
 
 
 def get_raw_contents(doc) -> str:
@@ -19,4 +24,8 @@ def get_raw_contents(doc) -> str:
         return get_hl_raw_contents(doc)
     if isinstance(doc, RawLine):
         return get_rawline_contents(doc)
+    if isinstance(doc, Line):
+        return get_span_contents(doc)
+    if isinstance(doc, list):
+        return ''.join([get_raw_contents(chunk) for chunk in doc])
     raise NotImplementedError('Unhandled type: ' + str(doc))

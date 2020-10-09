@@ -2,7 +2,7 @@ import collections
 import unittest
 from datetime import datetime
 
-from org_dom import get_raw_contents
+from org_dom import Line, Text, Bold, Code, Italic, Strike, Underlined, Verbatim, get_raw_contents
 
 
 def timestamp_to_datetime(ts):
@@ -68,10 +68,12 @@ class HL:
         if isinstance(self.content, str):
             test_case.assertEqual(get_raw_contents(doc), self.content)
         else:
+            if len(doc.contents) != len(self.content):
+                print("Contents:", doc.contents)
+                print("Expected:", self.content)
             test_case.assertEqual(len(doc.contents), len(self.content))
             for i, content in enumerate(self.content):
-                test_case.assertEqual(get_raw_contents(doc.contents[i]),
-                                      content.to_raw())
+                content.assert_matches(test_case, doc.contents[i])
 
         # Check children
         if self.children is None:
@@ -99,6 +101,16 @@ class SPAN:
 
         return ''.join(chunks)
 
+    def assert_matches(self, test_case, doc):
+        if not isinstance(doc, Line):
+            return False
+        for i, section in enumerate(self.contents):
+            if isinstance(section, str):
+                test_case.assertTrue(isinstance(doc.contents[i], Text))
+                test_case.assertEqual(section, doc.contents[i].get_raw())
+            else:
+                section.assertEqual(test_case, doc.contents[i])
+
 
 class BOLD:
     def __init__(self, text):
@@ -106,6 +118,10 @@ class BOLD:
 
     def to_raw(self):
         return '*{}*'.format(self.text)
+
+    def assertEqual(self, test_case, other):
+        test_case.assertTrue(isinstance(other, Bold))
+        test_case.assertEqual(self.text, other.contents)
 
 
 class CODE:
@@ -115,6 +131,9 @@ class CODE:
     def to_raw(self):
         return '~{}~'.format(self.text)
 
+    def assertEqual(self, test_case, other):
+        test_case.assertTrue(isinstance(other, Code))
+        test_case.assertEqual(self.text, other.contents)
 
 class ITALIC:
     def __init__(self, text):
@@ -123,6 +142,9 @@ class ITALIC:
     def to_raw(self):
         return '/{}/'.format(self.text)
 
+    def assertEqual(self, test_case, other):
+        test_case.assertTrue(isinstance(other, Italic))
+        test_case.assertEqual(self.text, other.contents)
 
 class STRIKE:
     def __init__(self, text):
@@ -130,6 +152,10 @@ class STRIKE:
 
     def to_raw(self):
         return '+{}+'.format(self.text)
+
+    def assertEqual(self, test_case, other):
+        test_case.assertTrue(isinstance(other, Strike))
+        test_case.assertEqual(self.text, other.contents)
 
 
 class UNDERLINED:
@@ -139,6 +165,9 @@ class UNDERLINED:
     def to_raw(self):
         return '_{}_'.format(self.text)
 
+    def assertEqual(self, test_case, other):
+        test_case.assertTrue(isinstance(other, Underlined))
+        test_case.assertEqual(self.text, other.contents)
 
 class VERBATIM:
     def __init__(self, text):
@@ -146,3 +175,7 @@ class VERBATIM:
 
     def to_raw(self):
         return '={}='.format(self.text)
+
+    def assertEqual(self, test_case, other):
+        test_case.assertTrue(isinstance(other, Verbatim))
+        test_case.assertEqual(self.text, other.contents)
