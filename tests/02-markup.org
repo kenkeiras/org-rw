@@ -19,3 +19,18 @@
   This is a _underlined phrase_.
 
   This is a ~code phrase~.
+
+  This is a nested *bold =verbatim /italic +strike _underlined ~code .~ ._ .+ ./ .= .*
+
+  This is a _ non-underlined phrase because an incorrectly placed content _.
+
+  This is a _ non-underlined phrase because an incorrectly placed content beginning_.
+
+  This is a _non-underlined phrase because an incorrectly placed content end _.
+
+  This is a _non-underlined phrase because the lack of an end.
+
+
+  This is a _non-underlined phrase because an empty line between beginning and
+
+  end._

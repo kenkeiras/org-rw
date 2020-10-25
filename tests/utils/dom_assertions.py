@@ -9,6 +9,15 @@ def timestamp_to_datetime(ts):
     return datetime(ts.year, ts.month, ts.day, ts.hour, ts.minute)
 
 
+def get_raw(doc):
+    if isinstance(doc, str):
+        return doc
+    elif isinstance(doc, list):
+        return ''.join([get_raw(e) for e in doc])
+    else:
+        return doc.get_raw()
+
+
 class Dom:
     def __init__(self, *, props=None, children=None):
         self.props = props
@@ -65,15 +74,7 @@ class HL:
                     test_case.assertEqual(
                         timestamp_to_datetime(doc_props[i].value), prop[1])
 
-        if isinstance(self.content, str):
-            test_case.assertEqual(get_raw_contents(doc), self.content)
-        else:
-            if len(doc.contents) != len(self.content):
-                print("Contents:", doc.contents)
-                print("Expected:", self.content)
-            test_case.assertEqual(len(doc.contents), len(self.content))
-            for i, content in enumerate(self.content):
-                content.assert_matches(test_case, doc.contents[i])
+        test_case.assertEqual(get_raw_contents(doc), self.get_raw())
 
         # Check children
         if self.children is None:
@@ -86,18 +87,21 @@ class HL:
             for i, children in enumerate(self.children):
                 children.assert_matches(test_case, doc_headlines[i])
 
+    def get_raw(self):
+        return ''.join(map(get_raw, self.content))
+
 
 class SPAN:
     def __init__(self, *kwargs):
         self.contents = kwargs
 
-    def to_raw(self):
+    def get_raw(self):
         chunks = []
         for section in self.contents:
             if isinstance(section, str):
                 chunks.append(section)
             else:
-                chunks.append(section.to_raw())
+                chunks.append(section.get_raw())
 
         return ''.join(chunks)
 
@@ -116,8 +120,8 @@ class BOLD:
     def __init__(self, text):
         self.text = text
 
-    def to_raw(self):
-        return '*{}*'.format(self.text)
+    def get_raw(self):
+        return '*{}*'.format(get_raw(self.text))
 
     def assertEqual(self, test_case, other):
         test_case.assertTrue(isinstance(other, Bold))
@@ -128,8 +132,8 @@ class CODE:
     def __init__(self, text):
         self.text = text
 
-    def to_raw(self):
-        return '~{}~'.format(self.text)
+    def get_raw(self):
+        return '~{}~'.format(get_raw(self.text))
 
     def assertEqual(self, test_case, other):
         test_case.assertTrue(isinstance(other, Code))
@@ -139,8 +143,8 @@ class ITALIC:
     def __init__(self, text):
         self.text = text
 
-    def to_raw(self):
-        return '/{}/'.format(self.text)
+    def get_raw(self):
+        return '/{}/'.format(get_raw(self.text))
 
     def assertEqual(self, test_case, other):
         test_case.assertTrue(isinstance(other, Italic))
@@ -150,8 +154,8 @@ class STRIKE:
     def __init__(self, text):
         self.text = text
 
-    def to_raw(self):
-        return '+{}+'.format(self.text)
+    def get_raw(self):
+        return '+{}+'.format(get_raw(self.text))
 
     def assertEqual(self, test_case, other):
         test_case.assertTrue(isinstance(other, Strike))
@@ -162,8 +166,8 @@ class UNDERLINED:
     def __init__(self, text):
         self.text = text
 
-    def to_raw(self):
-        return '_{}_'.format(self.text)
+    def get_raw(self):
+        return '_{}_'.format(get_raw(self.text))
 
     def assertEqual(self, test_case, other):
         test_case.assertTrue(isinstance(other, Underlined))
@@ -173,9 +177,22 @@ class VERBATIM:
     def __init__(self, text):
         self.text = text
 
-    def to_raw(self):
-        return '={}='.format(self.text)
+    def get_raw(self):
+        return '={}='.format(get_raw(self.text))
 
     def assertEqual(self, test_case, other):
         test_case.assertTrue(isinstance(other, Verbatim))
         test_case.assertEqual(self.text, other.contents)
+
+class WEB_LINK:
+    def __init__(self, text, link):
+        self.text = text
+        self.link = link
+
+    def get_raw(self):
+        return '[[{}][{}]]'.format(self.link, self.text)
+
+    def assertEqual(self, test_case, other):
+        test_case.assertTrue(isinstance(other, WebLink))
+        test_case.assertEqual(self.text, other.contents)
+        test_case.assertEqual(self.link, other.link)

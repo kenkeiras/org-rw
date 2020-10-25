@@ -109,6 +109,11 @@ def timestamp_to_string(ts):
     else:
         return '[{}]'.format(base)
 
+def get_raw(doc):
+    if isinstance(doc, str):
+        return doc
+    else:
+        return doc.get_raw()
 
 class Line:
     def __init__(self, linenum, contents):
@@ -125,73 +130,190 @@ class Line:
         return ''.join(rawchunks) + '\n'
 
 class Text:
-    def __init__(self, contents):
+    def __init__(self, contents, line):
         self.contents = contents
+        self.linenum = line
 
     def get_raw(self):
         raw = ''.join(self.contents)
         return raw
 
 class Bold:
-    def __init__(self, contents):
+    Marker = '*'
+
+    def __init__(self, contents, line):
         self.contents = contents
 
     def get_raw(self):
-        raw = ''.join(self.contents)
-        return f"*{raw}*"
+        raw = ''.join(map(get_raw, self.contents))
+        return f"{self.Marker}{raw}{self.Marker}"
 
 class Code:
-    def __init__(self, contents):
+    Marker = '~'
+
+    def __init__(self, contents, line):
         self.contents = contents
 
     def get_raw(self):
-        raw = ''.join(self.contents)
-        return f"~{raw}~"
+        raw = ''.join(map(get_raw, self.contents))
+        return f"{self.Marker}{raw}{self.Marker}"
 
 class Italic:
-    def __init__(self, contents):
+    Marker = '/'
+
+    def __init__(self, contents, line):
         self.contents = contents
 
     def get_raw(self):
-        raw = ''.join(self.contents)
-        return f"/{raw}/"
+        raw = ''.join(map(get_raw, self.contents))
+        return f"{self.Marker}{raw}{self.Marker}"
 
 class Strike:
-    def __init__(self, contents):
+    Marker = '+'
+
+    def __init__(self, contents, line):
         self.contents = contents
 
     def get_raw(self):
-        raw = ''.join(self.contents)
-        return f"+{raw}+"
+        raw = ''.join(map(get_raw, self.contents))
+        return f"{self.Marker}{raw}{self.Marker}"
 
 class Underlined:
-    def __init__(self, contents):
+    Marker = '_'
+
+    def __init__(self, contents, line):
         self.contents = contents
 
     def get_raw(self):
-        raw = ''.join(self.contents)
-        return f"_{raw}_"
+        raw = ''.join(map(get_raw, self.contents))
+        return f"{self.Marker}{raw}{self.Marker}"
 
 class Verbatim:
-    def __init__(self, contents):
+    Marker = '='
+
+    def __init__(self, contents, line):
         self.contents = contents
 
     def get_raw(self):
-        raw = ''.join(self.contents)
-        return f"={raw}="
+        raw = ''.join(map(get_raw, self.contents))
+        return f"{self.Marker}{raw}{self.Marker}"
+
+
+def is_pre(char: str) -> bool:
+    if isinstance(char, str):
+        return char in '\n\r\t -({\'"'
+    else:
+        return True
+
+def is_marker(char: str) -> bool:
+    if isinstance(char, str):
+        return char in '*=/+_~'
+    else:
+        return False
+
+def is_border(char: str) -> bool:
+    if isinstance(char, str):
+        return char not in '\n\r\t '
+    else:
+        return False
+
+def is_body(char: str) -> bool:
+    if isinstance(char, str):
+        return True
+    else:
+        return False
+
+def is_post(char: str) -> bool:
+    if isinstance(char, str):
+        return char in '-.,;:!?\')}["'
+    else:
+        return False
+
+TOKEN_TYPE_TEXT = 0
+TOKEN_TYPE_OPEN_MARKER = 1
+TOKEN_TYPE_CLOSE_MARKER = 2
+
+def tokenize_contents(contents: str):
+    tokens = []
+    last_char = None
+
+    text = []
+    closes = set()
+
+    for i, char in enumerate(contents):
+        has_changed = False
+
+        if (
+                (i not in closes)
+                and is_marker(char)
+                and is_pre(last_char)
+                and ((i + 1 < len(contents))
+                     and is_border(contents[i + 1]))):
+
+            is_valid_mark = False
+            # Check that is closed later
+            text_in_line = True
+            for j in range(i, len(contents) - 1):
+                if contents[j] == '\n':
+                    if not text_in_line:
+                        break
+                    text_in_line = False
+                elif is_border(contents[j]) and contents[j + 1] == char:
+                    is_valid_mark = True
+                    closes.add(j + 1)
+                    break
+                else:
+                    text_in_line |= is_body(contents[j])
+
+            if is_valid_mark:
+                if len(text) > 0:
+                    tokens.append((TOKEN_TYPE_TEXT, ''.join(text)))
+                    text = []
+                tokens.append((TOKEN_TYPE_OPEN_MARKER, char))
+                has_changed = True
+        elif i in closes:
+            if len(text) > 0:
+                tokens.append((TOKEN_TYPE_TEXT, ''.join(text)))
+                text = []
+            tokens.append((TOKEN_TYPE_CLOSE_MARKER, char))
+            has_changed = True
+
+        if not has_changed:
+            text.append(char)
+        last_char = char
+
+    if len(text) > 0:
+        tokens.append((TOKEN_TYPE_TEXT, ''.join(text)))
+
+    return tokens
 
 
 def parse_contents(raw_contents:List[RawLine]):
-    NO_MODE = 0
-    BOLD_MODE = 1
-    CODE_MODE = 2
-    ITALIC_MODE = 3
-    STRIKE_MODE = 4
-    UNDERLINED_MODE = 5
-    VERBATIM_MODE = 6
+    NO_MODE =         0b0
+    BOLD_MODE =       0b1
+    CODE_MODE =       0b10
+    ITALIC_MODE =     0b100
+    STRIKE_MODE =     0b1000
+    UNDERLINED_MODE = 0b10000
+    VERBATIM_MODE =   0b100000
 
-    MODE_CLASS = {
-        NO_MODE: Line,
+    MARKERS = {
+        '*': BOLD_MODE,
+        '~': CODE_MODE,
+        '/': ITALIC_MODE,
+        '+': STRIKE_MODE,
+        '_': UNDERLINED_MODE,
+        '=': VERBATIM_MODE,
+    }
+    MODES = (
+        (BOLD_MODE, Bold),
+        (CODE_MODE, Code),
+        (ITALIC_MODE, Italic),
+        (STRIKE_MODE, Strike),
+        (UNDERLINED_MODE, Underlined),
+        (VERBATIM_MODE, Verbatim),
+    )
+    _MODES = {
         BOLD_MODE: Bold,
         CODE_MODE: Code,
         ITALIC_MODE: Italic,
@@ -213,68 +335,80 @@ def parse_contents(raw_contents:List[RawLine]):
         contents_buff.append(line.line)
 
     contents = '\n'.join(contents_buff)
+    tokens = tokenize_contents(contents)
 
-    for c in contents:
-        if mode == NO_MODE:
-            if escaped:
-                chunk.append(c)
-                escaped = False
+    # Use tokens to tag chunks of text with it's container type
+    for (tok_type, tok_val) in tokens:
+        if tok_type == TOKEN_TYPE_TEXT:
+            chunks.append((mode, tok_val))
+        elif tok_type == TOKEN_TYPE_OPEN_MARKER:
+            mode = mode | MARKERS[tok_val]
+        elif tok_type == TOKEN_TYPE_OPEN_MARKER:
+            mode = mode ^ MARKERS[tok_val]
 
-            elif c == '\\':
-                escaped = True
-            elif c == '*':
-                mode = BOLD_MODE
-            elif c == '~':
-                mode = CODE_MODE
-            elif c == '/':
-                mode = ITALIC_MODE
-            elif c == '+':
-                mode = STRIKE_MODE
-            elif c == '_':
-                mode = UNDERLINED_MODE
-            elif c == '=':
-                mode = VERBATIM_MODE
-            elif c == '\n':
-                chunks.append(Line(linenum, inline + [Text(chunk)]))
-                chunk = []
-                inline = []
+    # Convert those chunks to a tree
+    def tree_for_tag(tag, in_mode):
+        tree = []
+        for (mask, mode) in MODES:
+            if (mask & tag) and not (mask & in_mode):
+                tree.append(mode)
+        print(tree)
+        if len(tree) == 0:
+            return Text
+
+
+    if len(raw_contents) > 0:
+        current_line = raw_contents[0].linenum
+
+    # tree = []
+    # pos = []
+    # print('\n'.join(map(str, chunks)))
+    # for (tag, chunk) in chunks:
+    #     if pos == []:
+    #         tree.append(tree_for_tag(tag, NO_MODE)(chunk, line=current_line))
+    #         pos.append(tree[-1])
+    #     else:
+    #         raise NotImplementedError()
+
+    #     current_line += chunk.count('\n')
+
+
+    tree = []
+    mode_tree = []
+    contents = []
+    # Use tokens to tag chunks of text with it's container type
+    for (tok_type, tok_val) in tokens:
+        if tok_type == TOKEN_TYPE_TEXT:
+            if len(mode_tree) == 0:
+                tree.append(Text(tok_val, current_line))
             else:
-                chunk.append(c)
+                contents[-1].append(tok_val)
 
-            if mode != NO_MODE:
-                inline.append(Text([''.join(chunk)]))
-                chunk = []
-        else:
-            if escaped:
-                chunk.append(c)
-                escaped = False
+            current_line += chunk.count('\n')
 
-            was_mode = mode
-            if mode == BOLD_MODE and c == '*':
-                mode = NO_MODE
-            elif mode == CODE_MODE and c == '~':
-                mode = NO_MODE
-            elif mode == ITALIC_MODE and c == '/':
-                mode = NO_MODE
-            elif mode == STRIKE_MODE and c == '+':
-                mode = NO_MODE
-            elif mode == UNDERLINED_MODE and c == '_':
-                mode = NO_MODE
-            elif mode == VERBATIM_MODE and c == '=':
-                mode = NO_MODE
-            elif c == '\n':
-                raise NotImplementedError("[{} | {}]".format(c, chunk))
+        elif tok_type == TOKEN_TYPE_OPEN_MARKER:
+            mode_tree.append(_MODES[MARKERS[tok_val]])
+            contents.append([])
+
+        elif tok_type == TOKEN_TYPE_CLOSE_MARKER:
+            mode = _MODES[MARKERS[tok_val]]
+            matching_mode = mode_tree.pop()
+            assert mode == matching_mode
+            value = mode(contents.pop(), current_line)
+            current_line += chunk.count('\n')
+
+            if len(mode_tree) == 0:  # Closed branch of tree
+                tree.append(value)
             else:
-                chunk.append(c)
+                print("{} <- {}".format(mode_tree[-1], mode))
+                contents[-1].append(value)
 
-            if mode == NO_MODE:
-                inline.append(MODE_CLASS[was_mode](''.join(chunk)))
-                chunk = []
+            current_line += chunk.count('\n')
 
-    assert(len(chunk) == 0)
-    assert(len(inline) == 0)
-
-    return chunks
+    if len(tree) > 3:
+        print("L", len(tree))
+    print("F:", tree)
+    return tree
 
 def parse_headline(hl) -> Headline:
     stars = hl['orig'].group('stars')
@@ -353,8 +487,8 @@ class OrgDom:
     def dump_contents(self, raw):
         if isinstance(raw, RawLine):
             return (raw.linenum, raw.line)
-        else:
-            return (raw.linenum, raw.get_raw())
+
+        return (raw.linenum, raw.get_raw())
 
     def dump_structural(self, structural: Tuple):
         return (structural[0], structural[1])

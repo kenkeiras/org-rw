@@ -1,0 +1,13 @@
+#+TITLE: 03-Links
+#+DESCRIPTION: Simple org file to test links
+#+TODO: TODO(t) PAUSED(p) |  DONE(d)
+
+
+* First level
+  :PROPERTIES:
+  :ID:       03-markup-first-level-id
+  :CREATED:  [2020-01-01 Wed 01:01]
+  :END:
+  This is a [[https://codigoparallevar.com][web link]].
+
+  This is an /italized [[https://codigoparallevar.com][web link]]/.
