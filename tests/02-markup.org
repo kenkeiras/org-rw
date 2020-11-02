@@ -22,6 +22,8 @@
 
   This is a nested *bold =verbatim /italic +strike _underlined ~code .~ ._ .+ ./ .= .*
 
+  This is a interleaved *bold =verbatim /italic +strike _underlined ~code .* .= ./ .+ ._ .~
+
   This is a _ non-underlined phrase because an incorrectly placed content _.
 
   This is a _ non-underlined phrase because an incorrectly placed content beginning_.

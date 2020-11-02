@@ -1,4 +1,6 @@
-from .org_dom import Headline, Line, RawLine, Text, Bold, Code, Italic, Strike, Underlined, Verbatim
+from .org_dom import (Bold, Code, Headline, Italic, Line, RawLine, Strike,
+                      Text, Underlined, Verbatim)
+
 
 def get_hl_raw_contents(doc: Headline) -> str:
     lines = []

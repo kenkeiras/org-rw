@@ -2,7 +2,8 @@ import collections
 import unittest
 from datetime import datetime
 
-from org_dom import Line, Text, Bold, Code, Italic, Strike, Underlined, Verbatim, get_raw_contents
+from org_dom import (Bold, Code, Italic, Line, Strike, Text, Underlined,
+                     Verbatim, get_raw_contents)
 
 
 def timestamp_to_datetime(ts):
@@ -13,7 +14,7 @@ def get_raw(doc):
     if isinstance(doc, str):
         return doc
     elif isinstance(doc, list):
-        return ''.join([get_raw(e) for e in doc])
+        return "".join([get_raw(e) for e in doc])
     else:
         return doc.get_raw()
 
@@ -44,8 +45,7 @@ class Dom:
             test_case.assertEqual(len(doc.getTopHeadlines()), 0, "Top")
         else:
             doc_headlines = doc.getTopHeadlines()
-            test_case.assertEqual(len(doc_headlines), len(self.children),
-                                  "Top")
+            test_case.assertEqual(len(doc_headlines), len(self.children), "Top")
 
             for i, children in enumerate(self.children):
                 children.assert_matches(test_case, doc_headlines[i])
@@ -72,7 +72,8 @@ class HL:
                 test_case.assertEqual(doc_props[i].key, prop[0])
                 if isinstance(prop[1], datetime):
                     test_case.assertEqual(
-                        timestamp_to_datetime(doc_props[i].value), prop[1])
+                        timestamp_to_datetime(doc_props[i].value), prop[1]
+                    )
 
         test_case.assertEqual(get_raw_contents(doc), self.get_raw())
 
@@ -81,14 +82,13 @@ class HL:
             test_case.assertEqual(len(doc.children), 0)
         else:
             doc_headlines = doc.children
-            test_case.assertEqual(len(doc_headlines), len(self.children),
-                                  self.title)
+            test_case.assertEqual(len(doc_headlines), len(self.children), self.title)
 
             for i, children in enumerate(self.children):
                 children.assert_matches(test_case, doc_headlines[i])
 
     def get_raw(self):
-        return ''.join(map(get_raw, self.content))
+        return "".join(map(get_raw, self.content))
 
 
 class SPAN:
@@ -100,10 +100,16 @@ class SPAN:
         for section in self.contents:
             if isinstance(section, str):
                 chunks.append(section)
+            elif isinstance(section, list):
+                for subsection in section:
+                    if isinstance(subsection, str):
+                        chunks.append(subsection)
+                    else:
+                        chunks.append(subsection.get_raw())
             else:
                 chunks.append(section.get_raw())
 
-        return ''.join(chunks)
+        return "".join(chunks)
 
     def assert_matches(self, test_case, doc):
         if not isinstance(doc, Line):
@@ -121,7 +127,7 @@ class BOLD:
         self.text = text
 
     def get_raw(self):
-        return '*{}*'.format(get_raw(self.text))
+        return "*{}*".format(get_raw(self.text))
 
     def assertEqual(self, test_case, other):
         test_case.assertTrue(isinstance(other, Bold))
@@ -133,29 +139,31 @@ class CODE:
         self.text = text
 
     def get_raw(self):
-        return '~{}~'.format(get_raw(self.text))
+        return "~{}~".format(get_raw(self.text))
 
     def assertEqual(self, test_case, other):
         test_case.assertTrue(isinstance(other, Code))
         test_case.assertEqual(self.text, other.contents)
+
 
 class ITALIC:
     def __init__(self, text):
         self.text = text
 
     def get_raw(self):
-        return '/{}/'.format(get_raw(self.text))
+        return "/{}/".format(get_raw(self.text))
 
     def assertEqual(self, test_case, other):
         test_case.assertTrue(isinstance(other, Italic))
         test_case.assertEqual(self.text, other.contents)
+
 
 class STRIKE:
     def __init__(self, text):
         self.text = text
 
     def get_raw(self):
-        return '+{}+'.format(get_raw(self.text))
+        return "+{}+".format(get_raw(self.text))
 
     def assertEqual(self, test_case, other):
         test_case.assertTrue(isinstance(other, Strike))
@@ -167,22 +175,24 @@ class UNDERLINED:
         self.text = text
 
     def get_raw(self):
-        return '_{}_'.format(get_raw(self.text))
+        return "_{}_".format(get_raw(self.text))
 
     def assertEqual(self, test_case, other):
         test_case.assertTrue(isinstance(other, Underlined))
         test_case.assertEqual(self.text, other.contents)
+
 
 class VERBATIM:
     def __init__(self, text):
         self.text = text
 
     def get_raw(self):
-        return '={}='.format(get_raw(self.text))
+        return "={}=".format(get_raw(self.text))
 
     def assertEqual(self, test_case, other):
         test_case.assertTrue(isinstance(other, Verbatim))
         test_case.assertEqual(self.text, other.contents)
+
 
 class WEB_LINK:
     def __init__(self, text, link):
@@ -190,9 +200,29 @@ class WEB_LINK:
         self.link = link
 
     def get_raw(self):
-        return '[[{}][{}]]'.format(self.link, self.text)
+        return "[[{}][{}]]".format(self.link, self.text)
 
     def assertEqual(self, test_case, other):
         test_case.assertTrue(isinstance(other, WebLink))
         test_case.assertEqual(self.text, other.contents)
         test_case.assertEqual(self.link, other.link)
+
+
+class Tokens:
+    BOLD_END = "*"
+    BOLD_START = "*"
+
+    VERBATIM_START = "="
+    VERBATIM_END = "="
+
+    ITALIC_START = "/"
+    ITALIC_END = "/"
+
+    STRIKE_START = "+"
+    STRIKE_END = "+"
+
+    UNDERLINED_START = "_"
+    UNDERLINED_END = "_"
+
+    CODE_START = "~"
+    CODE_END = "~"
