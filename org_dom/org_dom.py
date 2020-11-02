@@ -60,25 +60,57 @@ INACTIVE_TIME_STAMP_RE = re.compile(r"\[{}\]".format(BASE_TIME_STAMP_RE))
 # BASE_TIME_RANGE_RE = (r'(?P<start_year>\d{4})-(?P<start_month>\d{2})-(?P<start_day>\d{2}) (?P<start_dow>[^ ]+)((?P<start_hour>\d{1,2}):(?P<start_minute>\d{1,2}))?',
 #                       r'(?P<end_year>\d{4})-(?P<end_month>\d{2})-(?P<end_day>\d{2}) (?P<end_dow>[^ ]+)((?P<end_hour>\d{1,2}):(?P<end_minute>\d{1,2}))?')
 
-Headline = collections.namedtuple(
-    "Headline",
-    (
-        "start_line",
-        "depth",
-        "orig",
-        "properties",
-        "keywords",
-        "priority_start",
-        "priority",
-        "title_start",
-        "title",
-        "tags_start",
-        "tags",
-        "contents",
-        "children",
-        "structural",
-    ),
-)
+def get_tokens(value):
+    if isinstance(value, Text):
+        return value.contents
+    if isinstance(value, RawLine):
+        return [value.line]
+    raise Exception("Unknown how to get tokens from: {}".format(value))
+
+def get_links_from_content(content):
+    in_link = False
+    in_description = False
+    link_value = []
+    link_description = []
+
+    for tok in get_tokens(content):
+        if isinstance(tok, LinkToken):
+            if tok.tok_type == LinkTokenType.OPEN_LINK:
+                in_link = True
+            elif tok.tok_type == LinkTokenType.OPEN_DESCRIPTION:
+                in_description = True
+            elif tok.tok_type == LinkTokenType.CLOSE:
+                in_link = False
+                in_description = False
+                yield Link(''.join(link_value), ''.join(link_description))
+                link_value = []
+                link_description = []
+        elif isinstance(tok, str) and in_link:
+            if in_description:
+                link_description.append(tok)
+            else:
+                link_value.append(tok)
+
+class Headline:
+    def __init__(self, start_line, depth, orig, properties, keywords, priority_start, priority, title_start, title, tags_start, tags, contents, children, structural):
+        self.start_line = start_line
+        self.depth = depth
+        self.orig = orig
+        self.properties = properties
+        self.keywords = keywords
+        self.priority_start = priority_start
+        self.priority = priority
+        self.title_start = title_start
+        self.title = title
+        self.tags_start = tags_start
+        self.tags = tags
+        self.contents = contents
+        self.children = children
+        self.structural = structural
+
+    def get_links(self):
+        for content in self.contents:
+            yield from get_links_from_content(content)
 
 RawLine = collections.namedtuple("RawLine", ("linenum", "line"))
 Keyword = collections.namedtuple(
@@ -120,12 +152,17 @@ for tok, mode in MARKERS.items():
     ModeToMarker[mode] = tok
 
 MarkerToken = collections.namedtuple("MarkerToken", ("closing", "tok_type"))
+LinkToken = collections.namedtuple("LinkToken", ("tok_type"))
+
+class LinkTokenType(Enum):
+    OPEN_LINK = 3
+    OPEN_DESCRIPTION = 5
+    CLOSE = 4
 
 BEGIN_PROPERTIES = "OPEN_PROPERTIES"
 END_PROPERTIES = "CLOSE_PROPERTIES"
 
 def token_from_type(tok_type):
-    print(ModeToMarker, tok_type)
     return ModeToMarker[tok_type]
 
 
@@ -211,16 +248,39 @@ class Line:
         return "".join(rawchunks) + "\n"
 
 
+class Link:
+    def __init__(self, value, description):
+        self.value = value
+        self.description = description
+
+    def get_raw(self):
+        if self.description:
+            return '[[{}][{}]]'.format(self.value, self.description)
+        else:
+            return '[[{}]]'.format(self.value)
+
+
 class Text:
     def __init__(self, contents, line):
         self.contents = contents
         self.linenum = line
+
+    def __repr__(self):
+        return "{{Text line: {}; content: {} }}".format(self.linenum, self.contents)
 
     def get_raw(self):
         contents = []
         for chunk in self.contents:
             if isinstance(chunk, str):
                 contents.append(chunk)
+            elif isinstance(chunk, LinkToken):
+                if chunk.tok_type == LinkTokenType.OPEN_LINK:
+                    contents.append('[[')
+                elif chunk.tok_type == LinkTokenType.OPEN_DESCRIPTION:
+                    contents.append('][')
+                else:
+                    assert chunk.tok_type == LinkTokenType.CLOSE
+                    contents.append(']]')
             else:
                 assert isinstance(chunk, MarkerToken)
                 contents.append(token_from_type(chunk.tok_type))
@@ -331,6 +391,9 @@ def is_post(char: str) -> bool:
 TOKEN_TYPE_TEXT = 0
 TOKEN_TYPE_OPEN_MARKER = 1
 TOKEN_TYPE_CLOSE_MARKER = 2
+TOKEN_TYPE_OPEN_LINK = 3
+TOKEN_TYPE_CLOSE_LINK = 4
+TOKEN_TYPE_OPEN_DESCRIPTION = 5
 
 
 def tokenize_contents(contents: str):
@@ -339,11 +402,78 @@ def tokenize_contents(contents: str):
 
     text = []
     closes = set()
+    in_link = False
+    in_link_description = False
+    last_link_start = 0
 
-    for i, char in enumerate(contents):
+    def cut_string():
+        nonlocal text
+        nonlocal tokens
+
+        if len(text) > 0:
+            tokens.append((TOKEN_TYPE_TEXT, "".join(text)))
+            text = []
+
+
+    cursor = enumerate(contents)
+    for i, char in cursor:
         has_changed = False
 
-        if (
+        # Possible link opening
+        if char == '[':
+            if (len(contents) > i + 3
+                # At least 3 characters more to open and close a link
+                and contents[i + 1] == '['):
+                close = contents.find(']', i)
+
+                if close != -1 and contents[close + 1] == ']':
+                    # Link with no description
+                    cut_string()
+
+                    in_link = True
+                    tokens.append((TOKEN_TYPE_OPEN_LINK, None))
+                    assert '[' == (next(cursor)[1])
+                    last_link_start = i
+                    continue
+                if close != -1 and contents[close + 1] == '[':
+                    # Link with description?
+
+                    close = contents.find(']', close + 1)
+                    if close != -1 and contents[close + 1] == ']':
+                        # No match here means this is not an Org link
+                        cut_string()
+
+                        in_link = True
+                        tokens.append((TOKEN_TYPE_OPEN_LINK, None))
+                        assert '[' == (next(cursor)[1])
+                        last_link_start = i
+                        continue
+
+        # Possible link close or open of description
+        if char == ']' and in_link:
+            if contents[i + 1] == ']':
+                cut_string()
+
+                tokens.append((TOKEN_TYPE_CLOSE_LINK, None))
+                assert ']' == (next(cursor)[1])
+                in_link = False
+                in_link_description = False
+                continue
+
+            if contents[i + 1] == '[' and not in_link_description:
+                cut_string()
+
+                tokens.append((TOKEN_TYPE_OPEN_DESCRIPTION, None))
+                assert '[' == (next(cursor)[1])
+                continue
+
+            raise Exception("Link cannot contain ']' not followed by '[' or ']'. Starting with {}".format(contents[last_link_start:i + 10]))
+
+        if (in_link and not in_link_description):
+            # Link's pointer have no formatting
+            pass
+
+        elif (
             (i not in closes)
             and is_marker(char)
             and is_pre(last_char)
@@ -366,15 +496,11 @@ def tokenize_contents(contents: str):
                     text_in_line |= is_body(contents[j])
 
             if is_valid_mark:
-                if len(text) > 0:
-                    tokens.append((TOKEN_TYPE_TEXT, "".join(text)))
-                    text = []
+                cut_string()
                 tokens.append((TOKEN_TYPE_OPEN_MARKER, char))
                 has_changed = True
         elif i in closes:
-            if len(text) > 0:
-                tokens.append((TOKEN_TYPE_TEXT, "".join(text)))
-                text = []
+            cut_string()
             tokens.append((TOKEN_TYPE_CLOSE_MARKER, char))
             has_changed = True
 
@@ -406,6 +532,12 @@ def parse_contents(raw_contents: List[RawLine]):
             contents.append(MarkerToken(False, MARKERS[tok_val]))
         elif tok_type == TOKEN_TYPE_CLOSE_MARKER:
             contents.append(MarkerToken(True, MARKERS[tok_val]))
+        elif tok_type == TOKEN_TYPE_OPEN_LINK:
+            contents.append(LinkToken(LinkTokenType.OPEN_LINK))
+        elif tok_type == TOKEN_TYPE_OPEN_DESCRIPTION:
+            contents.append(LinkToken(LinkTokenType.OPEN_DESCRIPTION))
+        elif tok_type == TOKEN_TYPE_CLOSE_LINK:
+            contents.append(LinkToken(LinkTokenType.CLOSE))
 
     return [Text(contents, current_line)]
 
@@ -447,6 +579,13 @@ class OrgDom:
         raise NotImplementedError()
 
     ## Querying
+    def get_links(self):
+        for headline in self.headlines:
+            yield from headline.get_links()
+
+        for content in self.contents:
+            yield from get_links_from_content(content)
+
     def getProperties(self):
         return self.keywords
 

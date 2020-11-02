@@ -135,21 +135,31 @@ class TestSerde(unittest.TestCase):
 
         ex.assert_matches(self, doc)
 
-    # def test_links_file_03(self):
-    #     with open(os.path.join(DIR, '03-links.org')) as f:
-    #         doc = load(f)
+    def test_links_file_03(self):
+        with open(os.path.join(DIR, '03-links.org')) as f:
+            doc = load(f)
 
-    #     ex = Dom(props=[('TITLE', '03-Links'),
-    #                     ('DESCRIPTION', 'Simple org file to test links'),
-    #                     ('TODO', 'TODO(t) PAUSED(p) |  DONE(d)')],
-    #              children=(HL('First level',
-    #                           props=[
-    #                               ('ID', '03-markup-first-level-id'),
-    #                               ('CREATED', DT(2020, 1, 1, 1, 1)),
-    #                           ],
-    #                           content=[
-    #                               SPAN("  This is a ", WEB_LINK("web link", "https://codigoparallevar.com"),
-    #                                    "."),
-    #                           ])))
+        links = list(doc.get_links())
+        self.assertEqual(len(links), 2)
+        self.assertEqual(links[0].value, 'https://codigoparallevar.com/1')
+        self.assertEqual(links[0].description, 'web link')
 
-    #     ex.assert_matches(self, doc)
+        self.assertEqual(links[1].value, 'https://codigoparallevar.com/2')
+        self.assertEqual(links[1].description, 'web link')
+        ex = Dom(props=[('TITLE', '03-Links'),
+                        ('DESCRIPTION', 'Simple org file to test links'),
+                        ('TODO', 'TODO(t) PAUSED(p) |  DONE(d)')],
+                 children=(HL('First level',
+                              props=[
+                                  ('ID', '03-markup-first-level-id'),
+                                  ('CREATED', DT(2020, 1, 1, 1, 1)),
+                              ],
+                              content=[
+                                  SPAN("  This is a ", WEB_LINK("web link", "https://codigoparallevar.com/1"),
+                                       ".\n"),
+                                  SPAN("\n"),
+                                  SPAN("  This is a ",  ITALIC(["italized ", WEB_LINK("web link", "https://codigoparallevar.com/2")]),
+                                       ".\n"),
+                              ])))
+
+        ex.assert_matches(self, doc)
