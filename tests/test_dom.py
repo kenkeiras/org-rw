@@ -40,7 +40,15 @@ class TestSerde(unittest.TestCase):
 
     def test_mimic_write_file_01(self):
         """A goal of this library is to be able to update a file without changing parts not directly modified."""
-        with open(os.path.join(DIR, '01-simple.org')) as f:
+        with open(os.path.join(DIR, "01-simple.org")) as f:
+            orig = f.read()
+            doc = loads(orig)
+
+        self.assertEqual(dumps(doc), orig)
+
+    def test_mimic_write_file_01_second(self):
+        """A goal of this library is to be able to update a file without changing parts not directly modified."""
+        with open(os.path.join(DIR, "01-simple-2.org")) as f:
             orig = f.read()
             doc = loads(orig)
 

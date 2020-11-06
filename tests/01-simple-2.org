@@ -1,0 +1,26 @@
+#+TITLE: 01-Simple-second
+#+DESCRIPTION: Simple org file
+#+TODO: TODO(t) PAUSED(p) |  DONE(d)
+
+
+* First level
+:PROPERTIES:
+:ID:       01-simple-first-level-id
+:CREATED:  [2020-01-01 Wed 01:01]
+:END:
+First level content
+
+** Second level
+   :PROPERTIES:
+   :ID:       01-simple-second-level-id
+   :END:
+
+   Second level content with no indentation
+
+*** Third level with no content
+**** Forth level
+    :PROPERTIES:
+    :ID:       01-simple-forth-level-id
+    :END:
+
+    Forth level content
