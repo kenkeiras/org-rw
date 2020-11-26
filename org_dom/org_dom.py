@@ -515,6 +515,9 @@ def tokenize_contents(contents: str):
 
 
 def parse_contents(raw_contents: List[RawLine]):
+    if len(raw_contents) == 0:
+        return []
+
     contents_buff = []
     for line in raw_contents:
         contents_buff.append(line.line)
@@ -695,7 +698,8 @@ class OrgDom:
             last_type = ltype
             structured_lines.append(content)
 
-        yield "".join(structured_lines)
+        if len(structured_lines) > 0:
+            yield "".join(structured_lines)
 
         for child in headline.children:
             yield from self.dump_headline(child)

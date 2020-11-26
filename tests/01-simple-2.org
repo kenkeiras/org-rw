@@ -11,12 +11,10 @@
 First level content
 
 ** Second level
-   :PROPERTIES:
-   :ID:       01-simple-second-level-id
-   :END:
-
-   Second level content with no indentation
-
+:PROPERTIES:
+:ID:       01-simple-second-level-id
+:END:
+Second level content with no indentation or space around
 *** Third level with no content
 **** Forth level
     :PROPERTIES:
