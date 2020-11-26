@@ -47,6 +47,9 @@ KEYWORDS_RE = re.compile(
 PROPERTY_DRAWER_RE = re.compile(
     r"^(?P<indentation>\s*):PROPERTIES:(?P<end_indentation>\s*)$"
 )
+LOGBOOK_DRAWER_RE = re.compile(
+    r"^(?P<indentation>\s*):LOGBOOK:(?P<end_indentation>\s*)$"
+)
 DRAWER_END_RE = re.compile(r"^(?P<indentation>\s*):END:(?P<end_indentation>\s*)$")
 NODE_PROPERTIES_RE = re.compile(
     r"^(?P<indentation>\s*):(?P<key>[^+:]+)(?P<plus>\+)?:(?P<spacing>\s*)(?P<value>.*)$"
@@ -742,6 +745,7 @@ class OrgDomReader:
             "children": [],
             "keywords": [],
             "properties": [],
+            "logbook": [],
             "structural": [],
         }
 
@@ -782,6 +786,10 @@ class OrgDomReader:
         self.current_drawer = self.headline_hierarchy[-1]["properties"]
         self.headline_hierarchy[-1]["structural"].append((linenum, line))
 
+    def add_logbook_drawer_line(self, linenum: int, line: str, match: re.Match) -> int:
+        self.current_drawer = self.headline_hierarchy[-1]["logbook"]
+        self.headline_hierarchy[-1]["structural"].append((linenum, line))
+
     def add_drawer_end_line(self, linenum: int, line: str, match: re.Match) -> int:
         self.current_drawer = None
         self.headline_hierarchy[-1]["structural"].append((linenum, line))
@@ -815,6 +823,8 @@ class OrgDomReader:
                 self.add_keyword_line(linenum, m)
             elif m := PROPERTY_DRAWER_RE.match(line):
                 self.add_property_drawer_line(linenum, line, m)
+            elif m := LOGBOOK_DRAWER_RE.match(line):
+                self.add_logbook_drawer_line(linenum, line, m)
             elif m := DRAWER_END_RE.match(line):
                 self.add_drawer_end_line(linenum, line, m)
             elif m := NODE_PROPERTIES_RE.match(line):
