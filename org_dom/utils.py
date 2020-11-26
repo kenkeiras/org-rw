@@ -1,5 +1,15 @@
-from .org_dom import (Bold, Code, Headline, Italic, Line, RawLine, Strike,
-                      Text, Underlined, Verbatim)
+from .org_dom import (
+    Bold,
+    Code,
+    Headline,
+    Italic,
+    Line,
+    RawLine,
+    Strike,
+    Text,
+    Underlined,
+    Verbatim,
+)
 
 
 def get_hl_raw_contents(doc: Headline) -> str:
@@ -8,7 +18,7 @@ def get_hl_raw_contents(doc: Headline) -> str:
     for content in doc.contents:
         lines.append(get_raw_contents(content))
 
-    raw = ''.join(lines)
+    raw = "".join(lines)
     return raw
 
 
@@ -19,8 +29,10 @@ def get_rawline_contents(doc: RawLine) -> str:
 def get_span_contents(doc: Line) -> str:
     return doc.get_raw()
 
+
 def get_text_contents(doc: Text) -> str:
     return doc.get_raw()
+
 
 def get_raw_contents(doc) -> str:
     if isinstance(doc, Headline):
@@ -30,8 +42,8 @@ def get_raw_contents(doc) -> str:
     if isinstance(doc, Line):
         return get_span_contents(doc)
     if isinstance(doc, list):
-        return ''.join([get_raw_contents(chunk) for chunk in doc])
+        return "".join([get_raw_contents(chunk) for chunk in doc])
     if isinstance(doc, (Text, Bold, Code, Italic, Strike, Underlined, Verbatim)):
         return doc.get_raw()
-    print('Unhandled type: ' + str(doc))
-    raise NotImplementedError('Unhandled type: ' + str(doc))
+    print("Unhandled type: " + str(doc))
+    raise NotImplementedError("Unhandled type: " + str(doc))
