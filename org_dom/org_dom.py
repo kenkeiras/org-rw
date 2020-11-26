@@ -1,6 +1,8 @@
 import collections
+import difflib
 import logging
 import re
+import sys
 from enum import Enum
 from typing import List, Tuple
 
@@ -862,15 +864,23 @@ class OrgDomReader:
                 raise NotImplementedError("{}: ‘{}’".format(linenum, line))
 
 
-def loads(s, environment=BASE_ENVIRONMENT, extra_cautious=False):
+def loads(s, environment=BASE_ENVIRONMENT, extra_cautious=True):
     doc = OrgDomReader()
     doc.read(s, environment)
     dom = doc.finalize()
     if extra_cautious:  # Check that all options can be properly re-serialized
-        if dumps(dom) != s:
-            raise NotImplementedError(
-                "Error re-serializing, file uses something not implemented"
+        after_dump = dumps(dom)
+        if after_dump != s:
+            diff = list(
+                difflib.Differ().compare(
+                    s.splitlines(keepends=True), after_dump.splitlines(keepends=True)
+                )
             )
+
+            sys.stderr.writelines(diff)
+            # print("---\n" + after_dump + "\n---")
+
+            raise Exception("Difference found between existing version and dumped one")
     return dom
 
 
