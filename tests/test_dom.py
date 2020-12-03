@@ -5,19 +5,8 @@ from datetime import datetime as DT
 
 from org_dom import dumps, load, loads
 
-from utils.dom_assertions import (
-    BOLD,
-    CODE,
-    HL,
-    ITALIC,
-    SPAN,
-    STRIKE,
-    UNDERLINED,
-    VERBATIM,
-    WEB_LINK,
-    Dom,
-    Tokens,
-)
+from utils.dom_assertions import (BOLD, CODE, HL, ITALIC, SPAN, STRIKE,
+                                  UNDERLINED, VERBATIM, WEB_LINK, Dom, Tokens)
 
 DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -255,3 +244,30 @@ class TestSerde(unittest.TestCase):
         )
 
         ex.assert_matches(self, doc)
+
+    def test_mimic_write_file_04(self):
+        with open(os.path.join(DIR, "04-code.org")) as f:
+            orig = f.read()
+            doc = loads(orig)
+
+        self.assertEqual(dumps(doc), orig)
+
+    def test_code_file_04(self):
+        with open(os.path.join(DIR, "04-code.org")) as f:
+            doc = load(f)
+
+        snippets = list(doc.get_code_snippets())
+        self.assertEqual(len(snippets), 2)
+        self.assertEqual(
+            snippets[0].content,
+            'echo "This is a test"\n' + "exit 0 # Exit successfully",
+        )
+        self.assertEqual(
+            snippets[0].result,
+            "This is a test",
+        )
+
+        self.assertEqual(
+            snippets[1].content, 'echo "This is another test"\n' + "exit 0 # Comment"
+        )
+        self.assertEqual(snippets[1].result, "This is another test")

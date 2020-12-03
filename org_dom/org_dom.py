@@ -52,7 +52,7 @@ PROPERTY_DRAWER_RE = re.compile(
 LOGBOOK_DRAWER_RE = re.compile(
     r"^(?P<indentation>\s*):LOGBOOK:(?P<end_indentation>\s*)$"
 )
-DRAWER_END_RE = re.compile(r"^(?P<indentation>\s*):END:(?P<end_indentation>\s*)$")
+DRAWER_END_RE = re.compile(r"^(?P<indentation>\s*):END:(?P<end_indentation>\s*)$", re.I)
 NODE_PROPERTIES_RE = re.compile(
     r"^(?P<indentation>\s*):(?P<key>[^+:]+)(?P<plus>\+)?:(?P<spacing>\s*)(?P<value>.*)$"
 )
@@ -61,6 +61,12 @@ BASE_TIME_STAMP_RE = r"(?P<year>\d{4})-(?P<month>\d{2})-(?P<day>\d{2}) (?P<dow>[
 
 ACTIVE_TIME_STAMP_RE = re.compile(r"<{}>".format(BASE_TIME_STAMP_RE))
 INACTIVE_TIME_STAMP_RE = re.compile(r"\[{}\]".format(BASE_TIME_STAMP_RE))
+
+# Org-Babel
+BEGIN_SRC_RE = re.compile(r"^\s*#\+BEGIN_SRC(\s+(?P<content>.*))?$")
+END_SRC_RE = re.compile(r"^\s*#\+END_SRC\s*$")
+RESULTS_DRAWER_RE = re.compile(r"^\s*:results:\s*$")
+
 
 # BASE_TIME_RANGE_RE = (r'(?P<start_year>\d{4})-(?P<start_month>\d{2})-(?P<start_day>\d{2}) (?P<start_dow>[^ ]+)((?P<start_hour>\d{1,2}):(?P<start_minute>\d{1,2}))?',
 #                       r'(?P<end_year>\d{4})-(?P<end_month>\d{2})-(?P<end_day>\d{2}) (?P<end_dow>[^ ]+)((?P<end_hour>\d{1,2}):(?P<end_minute>\d{1,2}))?')
@@ -552,6 +558,35 @@ def parse_contents(raw_contents: List[RawLine]):
     if len(raw_contents) == 0:
         return []
 
+    blocks = []
+    current_block = []
+
+    for line in raw_contents:
+        if len(current_block) == 0:
+            # Seed the first block
+            current_line = line.linenum
+            current_block.append(line)
+        else:
+            if line.linenum == current_line + 1:
+                # Continue with the current block
+                current_line = line.linenum
+                current_block.append(line)
+            else:
+                # Mark the finishing block as not the last line
+                current_block.append(RawLine(current_line + 1, ''))
+                # Split the blocks
+                blocks.append(current_block)
+                current_line = line.linenum
+                current_block = [line]
+
+    # Check that the current block is not left behind
+    if len(current_block) > 0:
+        blocks.append(current_block)
+
+    return [parse_content_block(block) for block in blocks]
+
+
+def parse_content_block(raw_contents: List[RawLine]):
     contents_buff = []
     for line in raw_contents:
         contents_buff.append(line.line)
@@ -576,7 +611,7 @@ def parse_contents(raw_contents: List[RawLine]):
         elif tok_type == TOKEN_TYPE_CLOSE_LINK:
             contents.append(LinkToken(LinkTokenType.CLOSE))
 
-    return [Text(contents, current_line)]
+    return Text(contents, current_line)
 
 
 def parse_headline(hl) -> Headline:
@@ -776,6 +811,7 @@ class OrgDomReader:
             "children": [],
             "keywords": [],
             "properties": [],
+            "results": [],  # TODO: Move to each specific code block
             "logbook": [],
             "structural": [],
         }
@@ -813,8 +849,26 @@ class OrgDomReader:
         else:
             self.headline_hierarchy[-1]["contents"].append(raw)
 
+    def add_begin_src_line(self, linenum: int, match: re.Match) -> int:
+        raw = RawLine(linenum, match.group(0))
+        if len(self.headline_hierarchy) == 0:
+            self.contents.append(raw)
+        else:
+            self.headline_hierarchy[-1]["contents"].append(raw)
+
+    def add_end_src_line(self, linenum: int, match: re.Match) -> int:
+        raw = RawLine(linenum, match.group(0))
+        if len(self.headline_hierarchy) == 0:
+            self.contents.append(raw)
+        else:
+            self.headline_hierarchy[-1]["contents"].append(raw)
+
     def add_property_drawer_line(self, linenum: int, line: str, match: re.Match) -> int:
         self.current_drawer = self.headline_hierarchy[-1]["properties"]
+        self.headline_hierarchy[-1]["structural"].append((linenum, line))
+
+    def add_results_drawer_line(self, linenum: int, line: str, match: re.Match) -> int:
+        self.current_drawer = self.headline_hierarchy[-1]["results"]
         self.headline_hierarchy[-1]["structural"].append((linenum, line))
 
     def add_logbook_drawer_line(self, linenum: int, line: str, match: re.Match) -> int:
@@ -843,25 +897,40 @@ class OrgDomReader:
 
     def read(self, s, environment):
         lines = s.split("\n")
+        line_count = len(lines)
         reader = enumerate(lines)
 
         for linenum, line in reader:
-            if m := RAW_LINE_RE.match(line):
-                self.add_raw_line(linenum, line)
-            elif m := HEADLINE_RE.match(line):
-                self.add_headline(linenum, m)
-            elif m := KEYWORDS_RE.match(line):
-                self.add_keyword_line(linenum, m)
-            elif m := PROPERTY_DRAWER_RE.match(line):
-                self.add_property_drawer_line(linenum, line, m)
-            elif m := LOGBOOK_DRAWER_RE.match(line):
-                self.add_logbook_drawer_line(linenum, line, m)
-            elif m := DRAWER_END_RE.match(line):
-                self.add_drawer_end_line(linenum, line, m)
-            elif m := NODE_PROPERTIES_RE.match(line):
-                self.add_node_properties_line(linenum, m)
-            else:
-                raise NotImplementedError("{}: ‘{}’".format(linenum, line))
+            try:
+                last_line = linenum + 1 == line_count
+
+                if m := RAW_LINE_RE.match(line):
+                    self.add_raw_line(linenum, line)
+                elif m := HEADLINE_RE.match(line):
+                    self.add_headline(linenum, m)
+                elif m := KEYWORDS_RE.match(line):
+                    self.add_keyword_line(linenum, m)
+                elif m := PROPERTY_DRAWER_RE.match(line):
+                    self.add_property_drawer_line(linenum, line, m)
+                elif m := LOGBOOK_DRAWER_RE.match(line):
+                    self.add_logbook_drawer_line(linenum, line, m)
+                elif m := DRAWER_END_RE.match(line):
+                    self.add_drawer_end_line(linenum, line, m)
+                elif m := RESULTS_DRAWER_RE.match(line):
+                    self.add_results_drawer_line(linenum, line, m)
+                elif m := NODE_PROPERTIES_RE.match(line):
+                    self.add_node_properties_line(linenum, m)
+                # Org-babel
+                elif m := BEGIN_SRC_RE.match(line):
+                    self.add_begin_src_line(linenum, m)
+                elif m := END_SRC_RE.match(line):
+                    self.add_end_src_line(linenum, m)
+                # Not captured
+                else:
+                    self.add_raw_line(linenum, line)
+            except:
+                logging.error("Error line {}: {}".format(linenum + 1, line))
+                raise
 
 
 def loads(s, environment=BASE_ENVIRONMENT, extra_cautious=True):
