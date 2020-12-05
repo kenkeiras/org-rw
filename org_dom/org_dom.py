@@ -63,10 +63,10 @@ ACTIVE_TIME_STAMP_RE = re.compile(r"<{}>".format(BASE_TIME_STAMP_RE))
 INACTIVE_TIME_STAMP_RE = re.compile(r"\[{}\]".format(BASE_TIME_STAMP_RE))
 
 # Org-Babel
-BEGIN_SRC_RE = re.compile(r"^\s*#\+BEGIN_SRC(\s+(?P<content>.*))?$")
-END_SRC_RE = re.compile(r"^\s*#\+END_SRC\s*$")
-RESULTS_DRAWER_RE = re.compile(r"^\s*:results:\s*$")
-
+BEGIN_SRC_RE = re.compile(r"^\s*#\+BEGIN_SRC(?P<content>.*)$", re.I)
+END_SRC_RE = re.compile(r"^\s*#\+END_SRC\s*$", re.I)
+RESULTS_DRAWER_RE = re.compile(r"^\s*:results:\s*$", re.I)
+CodeSnippet = collections.namedtuple("CodeSnippet", ("name", "content", "result"))
 
 # BASE_TIME_RANGE_RE = (r'(?P<start_year>\d{4})-(?P<start_month>\d{2})-(?P<start_day>\d{2}) (?P<start_dow>[^ ]+)((?P<start_hour>\d{1,2}):(?P<start_minute>\d{1,2}))?',
 #                       r'(?P<end_year>\d{4})-(?P<end_month>\d{2})-(?P<end_day>\d{2}) (?P<end_dow>[^ ]+)((?P<end_hour>\d{1,2}):(?P<end_minute>\d{1,2}))?')
@@ -122,6 +122,7 @@ class Headline:
         contents,
         children,
         structural,
+        delimiters,
     ):
         self.start_line = start_line
         self.depth = depth
@@ -137,10 +138,111 @@ class Headline:
         self.contents = contents
         self.children = children
         self.structural = structural
+        self.delimiters = delimiters
 
     def get_links(self):
         for content in self.contents:
             yield from get_links_from_content(content)
+
+    def get_lines_between(self, start, end):
+        for line in self.contents:
+            if start <= line.linenum < end:
+                yield "".join(line.contents)
+
+    def get_element_in_line(self, linenum):
+        for line in self.contents:
+            if linenum == line.linenum:
+                return line
+
+        for (s_lnum, struc) in self.structural:
+            if linenum == s_lnum:
+                return ("structural", struc)
+
+    def get_structural_end_after(self, linenum):
+        for (s_lnum, struc) in self.structural:
+            if s_lnum > linenum and struc.strip().upper() == ":END:":
+                return (s_lnum, struc)
+
+    def get_code_snippets(self):
+        inside_code = False
+
+        sections = []
+
+        for delimiter in self.delimiters:
+            if delimiter.delimiter_type == DelimiterLineType.BEGIN_SRC:
+                line_start = delimiter.linenum
+                inside_code = True
+            elif delimiter.delimiter_type == DelimiterLineType.END_SRC:
+                inside_code = False
+                start, end = line_start, delimiter.linenum
+
+                lines = self.get_lines_between(start + 1, end)
+                contents = "\n".join(lines)
+                if contents.endswith("\n"):
+                    # This is not ideal, but to avoid having to do this maybe
+                    # the content parsing must be re-thinked
+                    contents = contents[:-1]
+
+                sections.append(
+                    {
+                        "line_first": start + 1,
+                        "line_last": end - 1,
+                        "content": contents,
+                    }
+                )
+                line_start = None
+
+        for kword in self.keywords:
+            if kword.key.upper() == "RESULTS":
+                for snippet in sections:
+                    if kword.linenum > snippet["line_last"]:
+                        result_first = self.get_element_in_line(kword.linenum + 1)
+
+                        if isinstance(result_first, Text):
+                            result = "\n".join(result_first.contents)
+                            snippet["result"] = result
+
+                            if result.strip().startswith(": "):
+                                # Split lines and remove ':'
+                                lines = result.split("\n")
+                                s_result = []
+                                for line in lines:
+                                    if ": " not in line:
+                                        break
+                                    s_result.append(line.lstrip(" ")[2:])
+                                snippet["result"] = "\n".join(s_result)
+                        elif (
+                            isinstance(result_first, tuple)
+                            and len(result_first) == 2
+                            and result_first[0] == "structural"
+                            and result_first[1].strip().upper() == ":RESULTS:"
+                        ):
+
+                            (end_line, _) = self.get_structural_end_after(
+                                kword.linenum + 1
+                            )
+                            contents = "\n".join(
+                                self.get_lines_between(kword.linenum + 1, end_line)
+                            )
+                            indentation = result_first[1].index(":")
+                            dedented = "\n".join(
+                                [line[indentation:] for line in contents.split("\n")]
+                            )
+                            if dedented.endswith("\n"):
+                                dedented = dedented[:-1]
+
+                            snippet["result"] = dedented
+
+                        break
+
+        results = []
+        for section in sections:
+            name = None
+            content = section["content"]
+            code_result = section.get("result", None)
+            results.append(CodeSnippet(name=name, content=content, result=code_result))
+
+        return results
 
 
 RawLine = collections.namedtuple("RawLine", ("linenum", "line"))
@@ -156,6 +258,16 @@ Property = collections.namedtuple(
 TimeRange = collections.namedtuple("TimeRange", ("start_time", "end_time"))
 Timestamp = collections.namedtuple(
     "Timestamp", ("active", "year", "month", "day", "dow", "hour", "minute")
+)
+
+
+class DelimiterLineType(Enum):
+    BEGIN_SRC = 1
+    END_SRC = 2
+
+
+DelimiterLine = collections.namedtuple(
+    "DelimiterLine", ("linenum", "line", "delimiter_type")
 )
 
 
@@ -573,7 +685,7 @@ def parse_contents(raw_contents: List[RawLine]):
                 current_block.append(line)
             else:
                 # Mark the finishing block as not the last line
-                current_block.append(RawLine(current_line + 1, ''))
+                current_block.append(RawLine(current_line + 1, ""))
                 # Split the blocks
                 blocks.append(current_block)
                 current_line = line.linenum
@@ -633,6 +745,7 @@ def parse_headline(hl) -> Headline:
         keywords=hl["keywords"],
         properties=hl["properties"],
         structural=hl["structural"],
+        delimiters=hl["delimiters"],
         title_start=None,
         priority=None,
         priority_start=None,
@@ -663,6 +776,10 @@ class OrgDom:
 
     def getTopHeadlines(self):
         return self.headlines
+
+    def get_code_snippets(self):
+        for headline in self.headlines:
+            yield from headline.get_code_snippets()
 
     # Writing
     def dump_kw(self, kw):
@@ -711,6 +828,9 @@ class OrgDom:
     def dump_structural(self, structural: Tuple):
         return (structural[0], structural[1])
 
+    def dump_delimiters(self, line: DelimiterLine):
+        return (line.linenum, line.line)
+
     def dump_headline(self, headline):
         yield "*" * headline.depth + " " + headline.orig.group(
             "spacing"
@@ -732,6 +852,9 @@ class OrgDom:
 
         for struct in headline.structural:
             lines.append((STRUCTURAL_T, self.dump_structural(struct)))
+
+        for content in headline.delimiters:
+            lines.append((STRUCTURAL_T, self.dump_delimiters(content)))
 
         lines = sorted(lines, key=lambda x: x[1][0])
 
@@ -793,6 +916,7 @@ class OrgDomReader:
         self.keywords: List[Property] = []
         self.headline_hierarchy: List[OrgDom] = []
         self.contents: List[RawLine] = []
+        self.delimiters: List[DelimiterLine] = []
 
     def finalize(self):
         return OrgDom(self.headlines, self.keywords, self.contents)
@@ -811,9 +935,10 @@ class OrgDomReader:
             "children": [],
             "keywords": [],
             "properties": [],
-            "results": [],  # TODO: Move to each specific code block
             "logbook": [],
             "structural": [],
+            "delimiters": [],
+            "results": [],  # TODO: Move to each specific code block?
         }
 
         while (depth - 2) > len(self.headline_hierarchy):
@@ -850,18 +975,18 @@ class OrgDomReader:
             self.headline_hierarchy[-1]["contents"].append(raw)
 
     def add_begin_src_line(self, linenum: int, match: re.Match) -> int:
-        raw = RawLine(linenum, match.group(0))
+        line = DelimiterLine(linenum, match.group(0), DelimiterLineType.BEGIN_SRC)
         if len(self.headline_hierarchy) == 0:
-            self.contents.append(raw)
+            self.delimiters.append(line)
         else:
-            self.headline_hierarchy[-1]["contents"].append(raw)
+            self.headline_hierarchy[-1]["delimiters"].append(line)
 
     def add_end_src_line(self, linenum: int, match: re.Match) -> int:
-        raw = RawLine(linenum, match.group(0))
+        line = DelimiterLine(linenum, match.group(0), DelimiterLineType.END_SRC)
         if len(self.headline_hierarchy) == 0:
-            self.contents.append(raw)
+            self.delimiters.append(line)
         else:
-            self.headline_hierarchy[-1]["contents"].append(raw)
+            self.headline_hierarchy[-1]["delimiters"].append(line)
 
     def add_property_drawer_line(self, linenum: int, line: str, match: re.Match) -> int:
         self.current_drawer = self.headline_hierarchy[-1]["properties"]
@@ -908,6 +1033,12 @@ class OrgDomReader:
                     self.add_raw_line(linenum, line)
                 elif m := HEADLINE_RE.match(line):
                     self.add_headline(linenum, m)
+                # Org-babel
+                elif m := BEGIN_SRC_RE.match(line):
+                    self.add_begin_src_line(linenum, m)
+                elif m := END_SRC_RE.match(line):
+                    self.add_end_src_line(linenum, m)
+                # Generic properties
                 elif m := KEYWORDS_RE.match(line):
                     self.add_keyword_line(linenum, m)
                 elif m := PROPERTY_DRAWER_RE.match(line):
@@ -920,11 +1051,6 @@ class OrgDomReader:
                     self.add_results_drawer_line(linenum, line, m)
                 elif m := NODE_PROPERTIES_RE.match(line):
                     self.add_node_properties_line(linenum, m)
-                # Org-babel
-                elif m := BEGIN_SRC_RE.match(line):
-                    self.add_begin_src_line(linenum, m)
-                elif m := END_SRC_RE.match(line):
-                    self.add_end_src_line(linenum, m)
                 # Not captured
                 else:
                     self.add_raw_line(linenum, line)

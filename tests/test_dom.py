@@ -260,14 +260,21 @@ class TestSerde(unittest.TestCase):
         self.assertEqual(len(snippets), 2)
         self.assertEqual(
             snippets[0].content,
-            'echo "This is a test"\n' + "exit 0 # Exit successfully",
+            'echo "This is a test"\n'
+            + 'echo "with two lines"\n'
+            + "exit 0 # Exit successfully",
         )
         self.assertEqual(
             snippets[0].result,
-            "This is a test",
+            "This is a test\n" + "with two lines",
         )
 
         self.assertEqual(
-            snippets[1].content, 'echo "This is another test"\n' + "exit 0 # Comment"
+            snippets[1].content,
+            'echo "This is another test"\n'
+            + 'echo "with two lines too"\n'
+            + "exit 0 # Comment",
         )
-        self.assertEqual(snippets[1].result, "This is another test")
+        self.assertEqual(
+            snippets[1].result, "This is another test\n" + "with two lines too"
+        )

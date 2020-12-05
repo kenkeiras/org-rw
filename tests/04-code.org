@@ -9,13 +9,15 @@
 :CREATED:  [2020-01-01 Wed 01:01]
 :END:
 
-#+BEGIN_SRC shell
+#+BEGIN_SRC shell :results verbatim
 echo "This is a test"
+echo "with two lines"
 exit 0 # Exit successfully
 #+END_SRC
 
 #+RESULTS:
 : This is a test
+: with two lines
 
 * Second item
     :PROPERTIES:
@@ -24,11 +26,13 @@ exit 0 # Exit successfully
     :END:
 
     #+BEGIN_SRC shell :results drawer
-      echo "This is another test"
-      exit 0 # Comment
+echo "This is another test"
+echo "with two lines too"
+exit 0 # Comment
     #+END_SRC
 
     #+RESULTS:
     :results:
     This is another test
+    with two lines too
     :end:
