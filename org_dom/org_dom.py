@@ -1044,10 +1044,9 @@ class OrgDomReader:
         line_count = len(lines)
         reader = enumerate(lines)
 
-        for linenum, line in reader:
+        for lnum, line in reader:
+            linenum = lnum + 1
             try:
-                last_line = linenum + 1 == line_count
-
                 if m := RAW_LINE_RE.match(line):
                     self.add_raw_line(linenum, line)
                 elif m := HEADLINE_RE.match(line):
