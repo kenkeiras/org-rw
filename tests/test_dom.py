@@ -278,3 +278,10 @@ class TestSerde(unittest.TestCase):
         self.assertEqual(
             snippets[1].result, "This is another test\n" + "with two lines too"
         )
+
+    def test_mimic_write_file_05(self):
+        with open(os.path.join(DIR, "05-dates.org")) as f:
+            orig = f.read()
+            doc = loads(orig)
+
+        self.assertEqual(dumps(doc), orig)

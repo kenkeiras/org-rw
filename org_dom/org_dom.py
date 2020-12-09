@@ -313,6 +313,10 @@ def token_from_type(tok_type):
     return ModeToMarker[tok_type]
 
 
+def parse_org_time_range(start, end):
+    return TimeRange(parse_org_time(start), parse_org_time(end))
+
+
 def parse_org_time(value):
     if m := ACTIVE_TIME_STAMP_RE.match(value):
         active = True
@@ -348,9 +352,13 @@ def parse_org_time(value):
         int(m.group("month")),
         int(m.group("day")),
         m.group("dow"),
-        int(m.group("start_hour")),
-        int(m.group("start_minute")),
+        int(m.group("start_hour")) if m.group("start_hour") else None,
+        int(m.group("start_minute")) if m.group("start_minute") else None,
     )
+
+
+def timerange_to_string(tr: TimeRange):
+    return timestamp_to_string(tr.start_time) + "--" + timestamp_to_string(tr.end_time)
 
 
 def timestamp_to_string(ts):
@@ -803,6 +811,8 @@ class OrgDom:
 
         if isinstance(prop.value, Timestamp):
             value = timestamp_to_string(prop.value)
+        elif isinstance(prop.value, TimeRange):
+            value = timerange_to_string(prop.value)
         else:
             value = prop.value
 
@@ -1012,8 +1022,8 @@ class OrgDomReader:
         if (value.count(">--<") == 1) or (value.count("]--[") == 1):
             # Time ranges with two different dates
             # @TODO properly consider "=> DURATION" section
-            chunks = value.split("=").split("--")
-            as_time_range = parse_org_time(chunks[0], chunks[1])
+            start, end = value.split("=")[0].split("--")
+            as_time_range = parse_org_time_range(start, end)
             if (as_time_range[0] is not None) and (as_time_range[1] is not None):
                 value = TimeRange(as_time_range[0], as_time_range[1])
         elif as_time := parse_org_time(value):
