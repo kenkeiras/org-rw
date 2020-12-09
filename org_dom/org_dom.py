@@ -1029,7 +1029,15 @@ class OrgDomReader:
         elif as_time := parse_org_time(value):
             value = as_time
 
-        self.current_drawer.append(Property(linenum, match, key, value, None))
+        try:
+            self.current_drawer.append(Property(linenum, match, key, value, None))
+        except:
+            if "current_drawer" not in dir(self):  # Throw a better error on this case
+                raise Exception(
+                    "Found properties before :PROPERTIES: line. Error on Org file?"
+                )
+            else:
+                raise  # Let the exception pass
 
     def read(self, s, environment):
         lines = s.split("\n")
