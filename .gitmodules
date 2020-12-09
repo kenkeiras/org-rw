@@ -1,0 +1,3 @@
+[submodule "extra-tests/organice"]
+	path = extra-tests/organice
+	url = https://github.com/200ok-ch/organice.git
