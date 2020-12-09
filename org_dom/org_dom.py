@@ -684,8 +684,6 @@ def parse_contents(raw_contents: List[RawLine]):
                 current_line = line.linenum
                 current_block.append(line)
             else:
-                # Mark the finishing block as not the last line
-                current_block.append(RawLine(current_line + 1, ""))
                 # Split the blocks
                 blocks.append(current_block)
                 current_line = line.linenum
@@ -884,14 +882,17 @@ class OrgDom:
                     )
                 )
 
-            elif ltype != CONTENT_T:
-                content = content + "\n"
-
+            content = content + "\n"
             last_type = ltype
             structured_lines.append(content)
 
         if len(structured_lines) > 0:
-            yield "".join(structured_lines)
+            content = "".join(structured_lines)
+
+            # Remove the last line jump, which will be accounted for by the "yield operation"
+            assert content.endswith("\n")
+            content = content[:-1]
+            yield content
 
         for child in headline.children:
             yield from self.dump_headline(child)
@@ -1075,7 +1076,7 @@ def loads(s, environment=BASE_ENVIRONMENT, extra_cautious=True):
             sys.stderr.writelines(diff)
             # print("---\n" + after_dump + "\n---")
 
-            raise Exception("Difference found between existing version and dumped one")
+            raise Exception("Difference found between existing version and dumped")
     return dom
 
 
@@ -1086,5 +1087,5 @@ def load(f, environment=BASE_ENVIRONMENT, extra_cautious=False):
 def dumps(doc):
     dump = list(doc.dump())
     result = "\n".join(dump)
-    print(result)
+    # print(result)
     return result

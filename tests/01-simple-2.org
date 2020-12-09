@@ -22,3 +22,9 @@ Second level content with no indentation or space around
     :END:
 
     Forth level content
+
+***** Fifth level with properties but no content
+    :PROPERTIES:
+    :ID:       01-simple-fifth-level-id
+    :END:
+****** Empty sixth level
