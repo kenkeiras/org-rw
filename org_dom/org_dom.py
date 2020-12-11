@@ -46,15 +46,10 @@ HEADLINE_RE = re.compile(r"^(?P<stars>\*+) (?P<spacing>\s*)(?P<line>.*)$")
 KEYWORDS_RE = re.compile(
     r"^(?P<indentation>\s*)#\+(?P<key>[^:\[]+)(\[(?P<options>[^\]]*)\])?:(?P<spacing>\s*)(?P<value>.*)$"
 )
-PROPERTY_DRAWER_RE = re.compile(
-    r"^(?P<indentation>\s*):PROPERTIES:(?P<end_indentation>\s*)$"
-)
-LOGBOOK_DRAWER_RE = re.compile(
-    r"^(?P<indentation>\s*):LOGBOOK:(?P<end_indentation>\s*)$"
-)
+DRAWER_START_RE = re.compile(r"^(?P<indentation>\s*):([^:]+):(?P<end_indentation>\s*)$")
 DRAWER_END_RE = re.compile(r"^(?P<indentation>\s*):END:(?P<end_indentation>\s*)$", re.I)
 NODE_PROPERTIES_RE = re.compile(
-    r"^(?P<indentation>\s*):(?P<key>[^+:]+)(?P<plus>\+)?:(?P<spacing>\s*)(?P<value>.*)$"
+    r"^(?P<indentation>\s*):(?P<key>[^+:]+)(?P<plus>\+)?:(?P<spacing>\s*)(?P<value>.+)$"
 )
 RAW_LINE_RE = re.compile(r"^\s*([^\s#:*]|$)")
 BASE_TIME_STAMP_RE = r"(?P<year>\d{4})-(?P<month>\d{2})-(?P<day>\d{2}) (?P<dow>[^ ]+)( (?P<start_hour>\d{1,2}):(?P<start_minute>\d{1,2})(--(?P<end_hour>\d{1,2}):(?P<end_minute>\d{1,2}))?)?"
@@ -738,7 +733,7 @@ def parse_headline(hl) -> Headline:
 
     # TODO: Parse line for priority, cookies and tags
     line = hl["orig"].group("line")
-    title = line.strip()
+    title = line
     contents = parse_contents(hl["contents"])
 
     return Headline(
@@ -1059,10 +1054,8 @@ class OrgDomReader:
                 # Generic properties
                 elif m := KEYWORDS_RE.match(line):
                     self.add_keyword_line(linenum, m)
-                elif m := PROPERTY_DRAWER_RE.match(line):
+                elif m := DRAWER_START_RE.match(line):
                     self.add_property_drawer_line(linenum, line, m)
-                elif m := LOGBOOK_DRAWER_RE.match(line):
-                    self.add_logbook_drawer_line(linenum, line, m)
                 elif m := DRAWER_END_RE.match(line):
                     self.add_drawer_end_line(linenum, line, m)
                 elif m := RESULTS_DRAWER_RE.match(line):
