@@ -243,6 +243,63 @@ class TestSerde(unittest.TestCase):
             ),
         )
 
+    def test_update_links_file_03(self):
+        with open(os.path.join(DIR, "03-links.org")) as f:
+            doc = load(f)
+
+        links = list(doc.get_links())
+        self.assertEqual(len(links), 2)
+        self.assertEqual(links[0].value, "https://codigoparallevar.com/1")
+        self.assertEqual(links[0].description, "web link")
+        links[0].value = "https://codigoparallevar.com/1-updated"
+        links[0].description = "web link #1 with update"
+
+        self.assertEqual(links[1].value, "https://codigoparallevar.com/2")
+        self.assertEqual(links[1].description, "web link")
+        links[1].value = "https://codigoparallevar.com/2-updated"
+        links[1].description = "web link #2 with update"
+
+        ex = Dom(
+            props=[
+                ("TITLE", "03-Links"),
+                ("DESCRIPTION", "Simple org file to test links"),
+                ("TODO", "TODO(t) PAUSED(p) |  DONE(d)"),
+            ],
+            children=(
+                HL(
+                    "First level",
+                    props=[
+                        ("ID", "03-markup-first-level-id"),
+                        ("CREATED", DT(2020, 1, 1, 1, 1)),
+                    ],
+                    content=[
+                        SPAN(
+                            "  This is a ",
+                            WEB_LINK(
+                                "web link #1 with update",
+                                "https://codigoparallevar.com/1-updated",
+                            ),
+                            ".\n",
+                        ),
+                        SPAN("\n"),
+                        SPAN(
+                            "  This is a ",
+                            ITALIC(
+                                [
+                                    "italized ",
+                                    WEB_LINK(
+                                        "web link #2 with update",
+                                        "https://codigoparallevar.com/2-updated",
+                                    ),
+                                ]
+                            ),
+                            ".\n",
+                        ),
+                    ],
+                )
+            ),
+        )
+
         ex.assert_matches(self, doc)
 
     def test_mimic_write_file_04(self):
