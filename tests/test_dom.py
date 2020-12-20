@@ -200,12 +200,19 @@ class TestSerde(unittest.TestCase):
             doc = load(f)
 
         links = list(doc.get_links())
-        self.assertEqual(len(links), 2)
+        self.assertEqual(len(links), 4)
         self.assertEqual(links[0].value, "https://codigoparallevar.com/1")
         self.assertEqual(links[0].description, "web link")
 
         self.assertEqual(links[1].value, "https://codigoparallevar.com/2")
         self.assertEqual(links[1].description, "web link")
+
+        self.assertEqual(links[2].value, "* First level")
+        self.assertEqual(links[2].description, None)
+
+        self.assertEqual(links[3].value, "id:03-markup-first-level-id")
+        self.assertEqual(links[3].description, "a link to a section by id")
+
         ex = Dom(
             props=[
                 ("TITLE", "03-Links"),
@@ -238,17 +245,34 @@ class TestSerde(unittest.TestCase):
                             ),
                             ".\n",
                         ),
+                        SPAN("\n"),
+                        SPAN(
+                            "  This is a link with no description to ",
+                            WEB_LINK(None, "* First level"),
+                            ".\n",
+                        ),
+                        SPAN("\n"),
+                        SPAN(
+                            "  This is ",
+                            WEB_LINK(
+                                "a link to a section by id",
+                                "id:03-markup-first-level-id",
+                            ),
+                            ".\n",
+                        ),
                     ],
                 )
             ),
         )
+
+        ex.assert_matches(self, doc)
 
     def test_update_links_file_03(self):
         with open(os.path.join(DIR, "03-links.org")) as f:
             doc = load(f)
 
         links = list(doc.get_links())
-        self.assertEqual(len(links), 2)
+        self.assertEqual(len(links), 4)
         self.assertEqual(links[0].value, "https://codigoparallevar.com/1")
         self.assertEqual(links[0].description, "web link")
         links[0].value = "https://codigoparallevar.com/1-updated"
@@ -258,6 +282,16 @@ class TestSerde(unittest.TestCase):
         self.assertEqual(links[1].description, "web link")
         links[1].value = "https://codigoparallevar.com/2-updated"
         links[1].description = "web link #2 with update"
+
+        self.assertEqual(links[2].value, "* First level")
+        self.assertEqual(links[2].description, None)
+        links[2].value = "* Non-existent level"
+        links[2].description = "a description now"
+
+        self.assertEqual(links[3].value, "id:03-markup-first-level-id")
+        self.assertEqual(links[3].description, "a link to a section by id")
+        links[3].value = "id:03-markup-non-existent-level-id"
+        links[3].description = None
 
         ex = Dom(
             props=[
@@ -292,6 +326,21 @@ class TestSerde(unittest.TestCase):
                                         "https://codigoparallevar.com/2-updated",
                                     ),
                                 ]
+                            ),
+                            ".\n",
+                        ),
+                        SPAN("\n"),
+                        SPAN(
+                            "  This is a link with no description to ",
+                            WEB_LINK("a description now", "* Non-existent level"),
+                            ".\n",
+                        ),
+                        SPAN("\n"),
+                        SPAN(
+                            "  This is ",
+                            WEB_LINK(
+                                None,
+                                "id:03-markup-non-existent-level-id",
                             ),
                             ".\n",
                         ),

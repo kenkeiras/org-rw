@@ -76,17 +76,33 @@ def get_tokens(value):
 
 
 class RangeInRaw:
-    def __init__(self, content, start, end):
+    def __init__(self, content, start_token, end_token):
         self._content = content
-        self._start = start
-        self._end = end
+        self._start_id = id(start_token)
+        self._end_id = id(end_token)
 
-    def update_range(self, contents):
-        if len(contents) == (self._end) - self._start:
-            for i in range(self._start, self._end):
-                self._content.contents[i] = contents[i - self._start]
+    def update_range(self, new_contents):
+        # Find start token
+        for start_idx, tok in enumerate(self._content.contents):
+            if id(tok) == self._start_id:
+                break
         else:
-            raise NotImplementedError()
+            raise Exception("Start token not found")
+
+        # Find end token
+        for offset, tok in enumerate(self._content.contents[start_idx:]):
+            if id(tok) == self._end_id:
+                break
+        else:
+            raise Exception("End token not found")
+
+        # Remove old contents
+        for i in range(1, offset):
+            self._content.contents.pop(start_idx + 1)
+
+        # Add new ones
+        for i, element in enumerate(new_contents):
+            self._content.contents.insert(start_idx + i + 1, element)
 
 
 def get_links_from_content(content):
@@ -99,11 +115,11 @@ def get_links_from_content(content):
         if isinstance(tok, LinkToken):
             if tok.tok_type == LinkTokenType.OPEN_LINK:
                 in_link = True
-                open_link_token = i + 1
+                open_link_token = tok
             elif tok.tok_type == LinkTokenType.OPEN_DESCRIPTION:
                 in_description = True
             elif tok.tok_type == LinkTokenType.CLOSE:
-                rng = RangeInRaw(content, open_link_token, i)
+                rng = RangeInRaw(content, open_link_token, tok)
                 yield Link(
                     "".join(link_value),
                     "".join(link_description) if in_description else None,

@@ -2,17 +2,8 @@ import collections
 import unittest
 from datetime import datetime
 
-from org_dom import (
-    Bold,
-    Code,
-    Italic,
-    Line,
-    Strike,
-    Text,
-    Underlined,
-    Verbatim,
-    get_raw_contents,
-)
+from org_dom import (Bold, Code, Italic, Line, Strike, Text, Underlined,
+                     Verbatim, get_raw_contents)
 
 
 def timestamp_to_datetime(ts):
@@ -209,7 +200,10 @@ class WEB_LINK:
         self.link = link
 
     def get_raw(self):
-        return "[[{}][{}]]".format(self.link, self.text)
+        if self.text:
+            return "[[{}][{}]]".format(self.link, self.text)
+        else:
+            return "[[{}]]".format(self.link)
 
     def assertEqual(self, test_case, other):
         test_case.assertTrue(isinstance(other, WebLink))
