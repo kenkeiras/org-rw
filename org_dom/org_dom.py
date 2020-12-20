@@ -4,7 +4,7 @@ import logging
 import re
 import sys
 from enum import Enum
-from typing import List, Tuple
+from typing import List, Tuple, Union
 
 BASE_ENVIRONMENT = {
     "org-footnote-section": "Footnotes",
@@ -75,22 +75,42 @@ def get_tokens(value):
     raise Exception("Unknown how to get tokens from: {}".format(value))
 
 
+class RangeInRaw:
+    def __init__(self, content, start, end):
+        self._content = content
+        self._start = start
+        self._end = end
+
+    def update_range(self, contents):
+        if len(contents) == (self._end) - self._start:
+            for i in range(self._start, self._end):
+                self._content.contents[i] = contents[i - self._start]
+        else:
+            raise NotImplementedError()
+
+
 def get_links_from_content(content):
     in_link = False
     in_description = False
     link_value = []
     link_description = []
 
-    for tok in get_tokens(content):
+    for i, tok in enumerate(get_tokens(content)):
         if isinstance(tok, LinkToken):
             if tok.tok_type == LinkTokenType.OPEN_LINK:
                 in_link = True
+                open_link_token = i + 1
             elif tok.tok_type == LinkTokenType.OPEN_DESCRIPTION:
                 in_description = True
             elif tok.tok_type == LinkTokenType.CLOSE:
+                rng = RangeInRaw(content, open_link_token, i)
+                yield Link(
+                    "".join(link_value),
+                    "".join(link_description) if in_description else None,
+                    rng,
+                )
                 in_link = False
                 in_description = False
-                yield Link("".join(link_value), "".join(link_description))
                 link_value = []
                 link_description = []
         elif isinstance(tok, str) and in_link:
@@ -399,15 +419,42 @@ class Line:
 
 
 class Link:
-    def __init__(self, value, description):
-        self.value = value
-        self.description = description
+    def __init__(self, value: str, description: str, origin: RangeInRaw):
+        self._value = value
+        self._description = description
+        self._origin = origin
 
     def get_raw(self):
         if self.description:
             return "[[{}][{}]]".format(self.value, self.description)
         else:
             return "[[{}]]".format(self.value)
+
+    def _update_content(self):
+        new_contents = []
+        new_contents.append(self._value)
+        if self._description:
+            new_contents.append(LinkToken(LinkTokenType.OPEN_DESCRIPTION))
+            new_contents.append(self._description)
+        self._origin.update_range(new_contents)
+
+    @property
+    def value(self):
+        return self._value
+
+    @value.setter
+    def value(self, new_value):
+        self._value = new_value
+        self._update_content()
+
+    @property
+    def description(self):
+        return self._description
+
+    @description.setter
+    def description(self, new_description):
+        self._description = new_description
+        self._update_content()
 
 
 class Text:
