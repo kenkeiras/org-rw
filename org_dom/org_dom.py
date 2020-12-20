@@ -808,9 +808,6 @@ class OrgDom:
         self.keywords: List[Property] = keywords
         self.contents: List[RawLine] = contents
 
-    def serialize(self):
-        raise NotImplementedError()
-
     ## Querying
     def get_links(self):
         for headline in self.headlines:
