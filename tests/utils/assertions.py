@@ -2,8 +2,8 @@ import collections
 import unittest
 from datetime import datetime
 
-from org_dom import (Bold, Code, Italic, Line, Strike, Text, Underlined,
-                     Verbatim, get_raw_contents)
+from org_rw import (Bold, Code, Italic, Line, Strike, Text, Underlined,
+                    Verbatim, get_raw_contents)
 
 
 def timestamp_to_datetime(ts):
@@ -19,7 +19,7 @@ def get_raw(doc):
         return doc.get_raw()
 
 
-class Dom:
+class Doc:
     def __init__(self, *, props=None, children=None):
         self.props = props
         self.children = children

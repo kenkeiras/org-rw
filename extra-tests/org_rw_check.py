@@ -3,7 +3,7 @@
 import os
 import sys
 
-import org_dom
+import org_rw
 
 top = sys.argv[1]
 count = 0
@@ -16,7 +16,7 @@ for root, dirs, files in os.walk(top):
         path = os.path.join(root, name)
         count += 1
         try:
-            org_dom.load(open(path), extra_cautious=True)
+            org_rw.load(open(path), extra_cautious=True)
         except Exception as err:
             import traceback
 

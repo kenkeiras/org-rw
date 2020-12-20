@@ -9,4 +9,4 @@ cd "`dirname $0`"
 git submodule update --init --recursive .
 
 # Run all checks
-python3 org_dom_check.py .
+python3 org_rw_check.py .

@@ -818,7 +818,7 @@ def parse_headline(hl) -> Headline:
     )
 
 
-class OrgDom:
+class OrgDoc:
     def __init__(self, headlines, keywords, contents):
         self.headlines: List[Headline] = list(map(parse_headline, headlines))
         self.keywords: List[Property] = keywords
@@ -976,16 +976,16 @@ class OrgDom:
             yield from self.dump_headline(headline)
 
 
-class OrgDomReader:
+class OrgDocReader:
     def __init__(self):
         self.headlines: List[Headline] = []
         self.keywords: List[Property] = []
-        self.headline_hierarchy: List[OrgDom] = []
+        self.headline_hierarchy: List[OrgDoc] = []
         self.contents: List[RawLine] = []
         self.delimiters: List[DelimiterLine] = []
 
     def finalize(self):
-        return OrgDom(self.headlines, self.keywords, self.contents)
+        return OrgDoc(self.headlines, self.keywords, self.contents)
 
     ## Construction
     def add_headline(self, linenum: int, match: re.Match) -> int:
@@ -1131,11 +1131,11 @@ class OrgDomReader:
 
 
 def loads(s, environment=BASE_ENVIRONMENT, extra_cautious=True):
-    doc = OrgDomReader()
-    doc.read(s, environment)
-    dom = doc.finalize()
+    reader = OrgDocReader()
+    reader.read(s, environment)
+    doc = reader.finalize()
     if extra_cautious:  # Check that all options can be properly re-serialized
-        after_dump = dumps(dom)
+        after_dump = dumps(doc)
         if after_dump != s:
             diff = list(
                 difflib.Differ().compare(
@@ -1147,7 +1147,7 @@ def loads(s, environment=BASE_ENVIRONMENT, extra_cautious=True):
             # print("---\n" + after_dump + "\n---")
 
             raise Exception("Difference found between existing version and dumped")
-    return dom
+    return doc
 
 
 def load(f, environment=BASE_ENVIRONMENT, extra_cautious=False):

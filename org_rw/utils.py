@@ -1,5 +1,5 @@
-from .org_dom import (Bold, Code, Headline, Italic, Line, RawLine, Strike,
-                      Text, Underlined, Verbatim)
+from .org_rw import (Bold, Code, Headline, Italic, Line, RawLine, Strike, Text,
+                     Underlined, Verbatim)
 
 
 def get_hl_raw_contents(doc: Headline) -> str:

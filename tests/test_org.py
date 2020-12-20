@@ -3,10 +3,10 @@ import os
 import unittest
 from datetime import datetime as DT
 
-from org_dom import dumps, load, loads
+from org_rw import dumps, load, loads
 
-from utils.dom_assertions import (BOLD, CODE, HL, ITALIC, SPAN, STRIKE,
-                                  UNDERLINED, VERBATIM, WEB_LINK, Dom, Tokens)
+from utils.assertions import (BOLD, CODE, HL, ITALIC, SPAN, STRIKE, UNDERLINED,
+                              VERBATIM, WEB_LINK, Doc, Tokens)
 
 DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -16,7 +16,7 @@ class TestSerde(unittest.TestCase):
         with open(os.path.join(DIR, "01-simple.org")) as f:
             doc = load(f)
 
-        ex = Dom(
+        ex = Doc(
             props=[
                 ("TITLE", "01-Simple"),
                 ("DESCRIPTION", "Simple org file"),
@@ -70,7 +70,7 @@ class TestSerde(unittest.TestCase):
         with open(os.path.join(DIR, "02-markup.org")) as f:
             doc = load(f)
 
-        ex = Dom(
+        ex = Doc(
             props=[
                 ("TITLE", "02-Markup"),
                 ("DESCRIPTION", "Simple org file to test markup"),
@@ -213,7 +213,7 @@ class TestSerde(unittest.TestCase):
         self.assertEqual(links[3].value, "id:03-markup-first-level-id")
         self.assertEqual(links[3].description, "a link to a section by id")
 
-        ex = Dom(
+        ex = Doc(
             props=[
                 ("TITLE", "03-Links"),
                 ("DESCRIPTION", "Simple org file to test links"),
@@ -293,7 +293,7 @@ class TestSerde(unittest.TestCase):
         links[3].value = "id:03-markup-non-existent-level-id"
         links[3].description = None
 
-        ex = Dom(
+        ex = Doc(
             props=[
                 ("TITLE", "03-Links"),
                 ("DESCRIPTION", "Simple org file to test links"),
