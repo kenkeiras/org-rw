@@ -1,6 +1,7 @@
 import collections
 import difflib
 import logging
+import os
 import re
 import sys
 from enum import Enum
@@ -41,8 +42,8 @@ BASE_ENVIRONMENT = {
     ),
 }
 
-
-HEADLINE_RE = re.compile(r"^(?P<stars>\*+) (?P<spacing>\s*)(?P<line>.*)$")
+HEADLINE_TAGS_RE = re.compile(r"((:[a-zA-Z0-9_@#%]+)+:)")
+HEADLINE_RE = re.compile(r"^(?P<stars>\*+) (?P<spacing>\s*)(?P<line>.*?)$")
 KEYWORDS_RE = re.compile(
     r"^(?P<indentation>\s*)#\+(?P<key>[^:\[]+)(\[(?P<options>[^\]]*)\])?:(?P<spacing>\s*)(?P<value>.*)$"
 )
@@ -148,12 +149,16 @@ class Headline:
         priority,
         title_start,
         title,
+        state,
         tags_start,
         tags,
         contents,
         children,
         structural,
         delimiters,
+        parent,
+        is_todo,
+        is_done,
     ):
         self.start_line = start_line
         self.depth = depth
@@ -164,12 +169,23 @@ class Headline:
         self.priority = priority
         self.title_start = title_start
         self.title = title
+        self.state = state
         self.tags_start = tags_start
-        self.tags = tags
+        self.shallow_tags = tags
         self.contents = contents
         self.children = children
         self.structural = structural
         self.delimiters = delimiters
+        self.parent = parent
+        self.is_todo = is_todo
+        self.is_done = is_done
+
+    @property
+    def tags(self):
+        if isinstance(self.parent, OrgDoc):
+            return list(self.shallow_tags)
+        else:
+            return list(self.shallow_tags) + self.parent.tags
 
     def get_links(self):
         for content in self.contents:
@@ -179,6 +195,16 @@ class Headline:
         for line in self.contents:
             if start <= line.linenum < end:
                 yield "".join(line.contents)
+
+    def get_contents(self, format):
+        if format == "raw":
+            lines = []
+            for line in self.contents:
+                lines.append(dump_contents(line))
+
+            yield from map(lambda x: x[1], sorted(lines, key=lambda x: x[0]))
+        else:
+            raise NotImplementedError()
 
     def get_element_in_line(self, linenum):
         for line in self.contents:
@@ -790,22 +816,54 @@ def parse_content_block(raw_contents: List[RawLine]):
     return Text(contents, current_line)
 
 
-def parse_headline(hl) -> Headline:
+def dump_contents(raw):
+    if isinstance(raw, RawLine):
+        return (raw.linenum, raw.line)
+
+    return (raw.linenum, raw.get_raw())
+
+
+def parse_headline(hl, doc, parent) -> Headline:
     stars = hl["orig"].group("stars")
     depth = len(stars)
 
     # TODO: Parse line for priority, cookies and tags
     line = hl["orig"].group("line")
+    hl_tags = HEADLINE_TAGS_RE.search(line)
+
+    if hl_tags is None:
+        tags = []
+    else:
+        tags = hl_tags.group(0)[1:-1].split(":")
+        line = HEADLINE_TAGS_RE.sub("", line)
+
+    hl_state = None
     title = line
+    is_done = is_todo = False
+    for state in doc.todo_keywords:
+        if title.startswith(state + " "):
+            hl_state = state
+            title = title[len(state + " ") :]
+            is_todo = True
+            break
+    else:
+        for state in doc.done_keywords:
+            if title.startswith(state + " "):
+                hl_state = state
+                title = title[len(state + " ") :]
+                is_done = True
+                break
+
     contents = parse_contents(hl["contents"])
 
-    return Headline(
+    headline = Headline(
         start_line=hl["linenum"],
         depth=depth,
         orig=hl["orig"],
         title=title,
+        state=hl_state,
         contents=contents,
-        children=[parse_headline(child) for child in hl["children"]],
+        children=None,
         keywords=hl["keywords"],
         properties=hl["properties"],
         structural=hl["structural"],
@@ -814,15 +872,40 @@ def parse_headline(hl) -> Headline:
         priority=None,
         priority_start=None,
         tags_start=None,
-        tags=None,
+        tags=tags,
+        parent=parent,
+        is_todo=is_todo,
+        is_done=is_done,
     )
+
+    headline.children = [
+        parse_headline(child, doc, headline) for child in hl["children"]
+    ]
+    return headline
 
 
 class OrgDoc:
     def __init__(self, headlines, keywords, contents):
-        self.headlines: List[Headline] = list(map(parse_headline, headlines))
+        self.todo_keywords = None
+        self.done_keywords = None
+
+        for keyword in keywords:
+            if keyword.key == "TODO":
+                todo_kws, done_kws = re.sub(r"\(.\)", "", keyword.value).split("|", 1)
+
+                self.todo_keywords = re.sub(r"\s{2,}", " ", todo_kws.strip()).split()
+                self.done_keywords = re.sub(r"\s{2,}", " ", done_kws.strip()).split()
+
         self.keywords: List[Property] = keywords
         self.contents: List[RawLine] = contents
+        self._path = None
+        self.headlines: List[Headline] = list(
+            map(lambda hl: parse_headline(hl, self, self), headlines)
+        )
+
+    @property
+    def path(self):
+        return self._path
 
     ## Querying
     def get_links(self):
@@ -882,12 +965,6 @@ class OrgDoc:
             ),
         )
 
-    def dump_contents(self, raw):
-        if isinstance(raw, RawLine):
-            return (raw.linenum, raw.line)
-
-        return (raw.linenum, raw.get_raw())
-
     def dump_structural(self, structural: Tuple):
         return (structural[0], structural[1])
 
@@ -908,7 +985,7 @@ class OrgDoc:
             lines.append((KW_T, self.dump_kw(keyword)))
 
         for content in headline.contents:
-            lines.append((CONTENT_T, self.dump_contents(content)))
+            lines.append((CONTENT_T, dump_contents(content)))
 
         for prop in headline.properties:
             lines.append((PROPERTIES_T, self.dump_property(prop)))
@@ -968,7 +1045,7 @@ class OrgDoc:
             lines.append(self.dump_kw(kw))
 
         for line in self.contents:
-            lines.append(self.dump_contents(line))
+            lines.append(dump_contents(line))
 
         yield from map(lambda x: x[1], sorted(lines, key=lambda x: x[0]))
 
@@ -1151,7 +1228,9 @@ def loads(s, environment=BASE_ENVIRONMENT, extra_cautious=True):
 
 
 def load(f, environment=BASE_ENVIRONMENT, extra_cautious=False):
-    return loads(f.read(), environment, extra_cautious)
+    doc = loads(f.read(), environment, extra_cautious)
+    doc._path = os.path.abspath(f.name)
+    return doc
 
 
 def dumps(doc):
@@ -1159,3 +1238,15 @@ def dumps(doc):
     result = "\n".join(dump)
     # print(result)
     return result
+
+
+def dump(doc, fp):
+    it = doc.dump()
+
+    # Write first line separately
+    line = next(it)
+    fp.write(line)
+
+    # Write following ones preceded by line jump
+    for line in it:
+        fp.write("\n" + line)
