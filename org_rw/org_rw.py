@@ -187,6 +187,13 @@ class Headline:
         else:
             return list(self.shallow_tags) + self.parent.tags
 
+    def get_property(self, name: str, default=None):
+        for prop in self.properties:
+            if prop.key == name:
+                return prop.value
+
+        return default
+
     def get_links(self):
         for content in self.contents:
             yield from get_links_from_content(content)
