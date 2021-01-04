@@ -4,6 +4,7 @@ import logging
 import os
 import re
 import sys
+from datetime import datetime, timedelta
 from enum import Enum
 from typing import List, Tuple, Union
 
@@ -53,7 +54,7 @@ NODE_PROPERTIES_RE = re.compile(
     r"^(?P<indentation>\s*):(?P<key>[^+:]+)(?P<plus>\+)?:(?P<spacing>\s*)(?P<value>.+)$"
 )
 RAW_LINE_RE = re.compile(r"^\s*([^\s#:*]|$)")
-BASE_TIME_STAMP_RE = r"(?P<year>\d{4})-(?P<month>\d{2})-(?P<day>\d{2}) (?P<dow>[^ ]+)( (?P<start_hour>\d{1,2}):(?P<start_minute>\d{1,2})(--(?P<end_hour>\d{1,2}):(?P<end_minute>\d{1,2}))?)?"
+BASE_TIME_STAMP_RE = r"(?P<year>\d{4})-(?P<month>\d{2})-(?P<day>\d{2})( ?(?P<dow>[^ ]+))?( (?P<start_hour>\d{1,2}):(?P<start_minute>\d{1,2})(--(?P<end_hour>\d{1,2}):(?P<end_minute>\d{1,2}))?)?"
 
 ACTIVE_TIME_STAMP_RE = re.compile(r"<{}>".format(BASE_TIME_STAMP_RE))
 INACTIVE_TIME_STAMP_RE = re.compile(r"\[{}\]".format(BASE_TIME_STAMP_RE))
@@ -179,6 +180,28 @@ class Headline:
         self.parent = parent
         self.is_todo = is_todo
         self.is_done = is_done
+
+    @property
+    def clock(self):
+        times = []
+        for chunk in self.contents:
+            for line in chunk.get_raw().split("\n"):
+                content = line.strip()
+                if not content.startswith("CLOCK:"):
+                    continue
+
+                time_seg = content[len("CLOCK:") :].strip()
+
+                if "--" in time_seg:
+                    # TODO: Consider duration
+                    start, end = time_seg.split("=")[0].split("--")
+                    as_time_range = parse_org_time_range(start, end)
+                    parsed = as_time_range
+                else:
+                    parsed = parse_org_time(time_seg)
+                times.append(parsed)
+
+        return times
 
     @property
     def tags(self):
@@ -319,7 +342,6 @@ Property = collections.namedtuple(
 
 # @TODO How are [YYYY-MM-DD HH:mm--HH:mm] and ([... HH:mm]--[... HH:mm]) differentiated ?
 # @TODO Consider recurrence annotations
-TimeRange = collections.namedtuple("TimeRange", ("start_time", "end_time"))
 Timestamp = collections.namedtuple(
     "Timestamp", ("active", "year", "month", "day", "dow", "hour", "minute")
 )
@@ -377,6 +399,27 @@ def token_from_type(tok_type):
     return ModeToMarker[tok_type]
 
 
+class TimeRange:
+    def __init__(self, start_time, end_time):
+        self.start_time = start_time
+        self.end_time = end_time
+
+    @property
+    def duration(self) -> timedelta:
+        delta = self.end - self.start
+        return delta
+
+    @property
+    def start(self) -> datetime:
+        st = self.start_time
+        return datetime(st.year, st.month, st.day, st.hour or 0, st.minute or 0)
+
+    @property
+    def end(self) -> datetime:
+        et = self.end_time
+        return datetime(et.year, et.month, et.day, et.hour or 0, et.minute or 0)
+
+
 def parse_org_time_range(start, end):
     return TimeRange(parse_org_time(start), parse_org_time(end))
 
@@ -425,7 +468,7 @@ def timerange_to_string(tr: TimeRange):
     return timestamp_to_string(tr.start_time) + "--" + timestamp_to_string(tr.end_time)
 
 
-def timestamp_to_string(ts):
+def timestamp_to_string(ts: Timestamp):
     date = "{year}-{month:02d}-{day:02d}".format(
         year=ts.year, month=ts.month, day=ts.day
     )
@@ -1163,8 +1206,12 @@ class OrgDocReader:
             # @TODO properly consider "=> DURATION" section
             start, end = value.split("=")[0].split("--")
             as_time_range = parse_org_time_range(start, end)
-            if (as_time_range[0] is not None) and (as_time_range[1] is not None):
-                value = TimeRange(as_time_range[0], as_time_range[1])
+            if (as_time_range.start_time is not None) and (
+                as_time_range.end_time is not None
+            ):
+                value = as_time_range
+            else:
+                raise Exception("Unknown time range format: {}".format(value))
         elif as_time := parse_org_time(value):
             value = as_time
 
