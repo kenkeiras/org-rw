@@ -43,7 +43,7 @@ BASE_ENVIRONMENT = {
     ),
 }
 
-HEADLINE_TAGS_RE = re.compile(r"((:[a-zA-Z0-9_@#%]+)+:)")
+HEADLINE_TAGS_RE = re.compile(r"((:[a-zA-Z0-9_@#%]+)+:)\s*$")
 HEADLINE_RE = re.compile(r"^(?P<stars>\*+) (?P<spacing>\s*)(?P<line>.*?)$")
 KEYWORDS_RE = re.compile(
     r"^(?P<indentation>\s*)#\+(?P<key>[^:\[]+)(\[(?P<options>[^\]]*)\])?:(?P<spacing>\s*)(?P<value>.*)$"
@@ -890,14 +890,14 @@ def parse_headline(hl, doc, parent) -> Headline:
     hl_state = None
     title = line
     is_done = is_todo = False
-    for state in doc.todo_keywords:
+    for state in doc.todo_keywords or []:
         if title.startswith(state + " "):
             hl_state = state
             title = title[len(state + " ") :]
             is_todo = True
             break
     else:
-        for state in doc.done_keywords:
+        for state in doc.done_keywords or []:
             if title.startswith(state + " "):
                 hl_state = state
                 title = title[len(state + " ") :]
@@ -1022,9 +1022,18 @@ class OrgDoc:
         return (line.linenum, line.line)
 
     def dump_headline(self, headline):
-        yield "*" * headline.depth + " " + headline.orig.group(
+
+        tags = ""
+        if len(headline.shallow_tags) > 0:
+            tags = ":" + ":".join(headline.shallow_tags) + ":"
+
+        state = ""
+        if headline.state:
+            state = headline.state + " "
+
+        yield "*" * headline.depth + " " + state + headline.orig.group(
             "spacing"
-        ) + headline.title
+        ) + headline.title + tags
 
         lines = []
         KW_T = 0
