@@ -1,6 +1,7 @@
 import logging
 import os
 import unittest
+from datetime import date
 from datetime import datetime as DT
 
 from org_rw import dumps, load, loads
@@ -391,3 +392,13 @@ class TestSerde(unittest.TestCase):
             doc = loads(orig)
 
         self.assertEqual(dumps(doc), orig)
+
+    def test_planning_info_file_05(self):
+        with open(os.path.join(DIR, "05-dates.org")) as f:
+            orig = f.read()
+            doc = loads(orig)
+
+        hl = doc.getTopHeadlines()[0]
+        self.assertEqual(hl.scheduled.date, date(2020, 12, 12))
+        self.assertEqual(hl.closed.date, date(2020, 12, 13))
+        self.assertEqual(hl.deadline.date, date(2020, 12, 14))

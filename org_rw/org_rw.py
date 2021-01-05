@@ -4,7 +4,7 @@ import logging
 import os
 import re
 import sys
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from enum import Enum
 from typing import List, Tuple, Union
 
@@ -55,9 +55,25 @@ NODE_PROPERTIES_RE = re.compile(
 )
 RAW_LINE_RE = re.compile(r"^\s*([^\s#:*]|$)")
 BASE_TIME_STAMP_RE = r"(?P<year>\d{4})-(?P<month>\d{2})-(?P<day>\d{2})( ?(?P<dow>[^ ]+))?( (?P<start_hour>\d{1,2}):(?P<start_minute>\d{1,2})(--(?P<end_hour>\d{1,2}):(?P<end_minute>\d{1,2}))?)?"
+CLEAN_TIME_STAMP_RE = (
+    r"\d{4}-\d{2}-\d{2}( ?([^ ]+))?( (\d{1,2}):(\d{1,2})(--(\d{1,2}):(\d{1,2}))?)?"
+)
 
 ACTIVE_TIME_STAMP_RE = re.compile(r"<{}>".format(BASE_TIME_STAMP_RE))
 INACTIVE_TIME_STAMP_RE = re.compile(r"\[{}\]".format(BASE_TIME_STAMP_RE))
+PLANNING_RE = re.compile(
+    r"(?P<indentation>\s*)"
+    + r"(SCHEDULED:\s*(?P<scheduled>[<\[]"
+    + CLEAN_TIME_STAMP_RE
+    + r"[>\]])\s*"
+    + r"|CLOSED:\s*(?P<closed>[<\[]"
+    + CLEAN_TIME_STAMP_RE
+    + r"[>\]])\s*"
+    + r"|DEADLINE:\s*(?P<deadline>[<\[]"
+    + CLEAN_TIME_STAMP_RE
+    + r"[>\]])\s*"
+    r")+\s*"
+)
 
 # Org-Babel
 BEGIN_SRC_RE = re.compile(r"^\s*#\+BEGIN_SRC(?P<content>.*)$", re.I)
@@ -180,6 +196,24 @@ class Headline:
         self.parent = parent
         self.is_todo = is_todo
         self.is_done = is_done
+        self.scheduled = None
+        self.deadline = None
+        self.closed = None
+
+        # Read planning line
+        planning_line = self.get_element_in_line(start_line + 1)
+
+        # Ignore if not found or is a structural line
+        if planning_line is None or isinstance(planning_line, tuple):
+            return
+
+        if m := PLANNING_RE.match(planning_line.get_raw()):
+            if scheduled := m.group("scheduled"):
+                self.scheduled = time_from_str(scheduled)
+            if closed := m.group("closed"):
+                self.closed = time_from_str(closed)
+            if deadline := m.group("deadline"):
+                self.deadline = time_from_str(deadline)
 
     @property
     def clock(self):
@@ -462,6 +496,16 @@ def parse_org_time(value):
         int(m.group("start_hour")) if m.group("start_hour") else None,
         int(m.group("start_minute")) if m.group("start_minute") else None,
     )
+
+
+class OrgTime:
+    def __init__(self, ts: Timestamp):
+        self.time = ts
+        self.date = date(ts.year, ts.month, ts.day)
+
+
+def time_from_str(s: str):
+    return OrgTime(parse_org_time(s))
 
 
 def timerange_to_string(tr: TimeRange):
