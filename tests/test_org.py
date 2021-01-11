@@ -4,7 +4,7 @@ import unittest
 from datetime import date
 from datetime import datetime as DT
 
-from org_rw import dumps, load, loads
+from org_rw import Timestamp, dumps, load, loads
 
 from utils.assertions import (BOLD, CODE, HL, ITALIC, SPAN, STRIKE, UNDERLINED,
                               VERBATIM, WEB_LINK, Doc, Tokens)
@@ -399,6 +399,37 @@ class TestSerde(unittest.TestCase):
             doc = loads(orig)
 
         hl = doc.getTopHeadlines()[0]
-        self.assertEqual(hl.scheduled.date, date(2020, 12, 12))
-        self.assertEqual(hl.closed.date, date(2020, 12, 13))
-        self.assertEqual(hl.deadline.date, date(2020, 12, 14))
+        self.assertEqual(
+            hl.scheduled.time, Timestamp(True, 2020, 12, 12, "Sáb", None, None)
+        )
+        self.assertEqual(
+            hl.closed.time, Timestamp(True, 2020, 12, 13, "Dom", None, None)
+        )
+        self.assertEqual(
+            hl.deadline.time, Timestamp(True, 2020, 12, 14, "Lun", None, None)
+        )
+
+    def test_update_info_file_05(self):
+        with open(os.path.join(DIR, "05-dates.org")) as f:
+            orig = f.read()
+            doc = loads(orig)
+
+        hl = doc.getTopHeadlines()[0]
+        hl.scheduled.time.day = 15
+        hl.closed.time.day = 16
+        hl.deadline.time.day = 17
+
+        # Account for removeing 3 days-of-week + 1 space each
+        self.assertEqual(len(dumps(doc)), len(orig) - (4) * 3)
+        doc_updated = loads(dumps(doc))
+
+        hl_up = doc_updated.getTopHeadlines()[0]
+        self.assertEqual(
+            hl.scheduled.time, Timestamp(True, 2020, 12, 15, None, None, None)
+        )
+        self.assertEqual(
+            hl.closed.time, Timestamp(True, 2020, 12, 16, None, None, None)
+        )
+        self.assertEqual(
+            hl.deadline.time, Timestamp(True, 2020, 12, 17, None, None, None)
+        )

@@ -54,10 +54,8 @@ NODE_PROPERTIES_RE = re.compile(
     r"^(?P<indentation>\s*):(?P<key>[^+:]+)(?P<plus>\+)?:(?P<spacing>\s*)(?P<value>.+)$"
 )
 RAW_LINE_RE = re.compile(r"^\s*([^\s#:*]|$)")
-BASE_TIME_STAMP_RE = r"(?P<year>\d{4})-(?P<month>\d{2})-(?P<day>\d{2})( ?(?P<dow>[^ ]+))?( (?P<start_hour>\d{1,2}):(?P<start_minute>\d{1,2})(--(?P<end_hour>\d{1,2}):(?P<end_minute>\d{1,2}))?)?"
-CLEAN_TIME_STAMP_RE = (
-    r"\d{4}-\d{2}-\d{2}( ?([^ ]+))?( (\d{1,2}):(\d{1,2})(--(\d{1,2}):(\d{1,2}))?)?"
-)
+BASE_TIME_STAMP_RE = r"(?P<year>\d{4})-(?P<month>\d{2})-(?P<day>\d{2})( ?(?P<dow>[^ ]+))?( (?P<start_hour>\d{1,2}):(?P<start_minute>\d{1,2})(--(?P<end_hour>\d{1,2}):(?P<end_minute>\d{1,2}))?)?(?P<repetition> (?P<rep_mark>(\+|\+\+|\.\+|-|--))(?P<rep_value>\d+)(?P<rep_unit>[hdwmy]))?"
+CLEAN_TIME_STAMP_RE = r"\d{4}-\d{2}-\d{2}( ?([^ ]+))?( (\d{1,2}):(\d{1,2})(--(\d{1,2}):(\d{1,2}))?)?( (\+|\+\+|\.\+|-|--)\d+[hdwmy])?"
 
 ACTIVE_TIME_STAMP_RE = re.compile(r"<{}>".format(BASE_TIME_STAMP_RE))
 INACTIVE_TIME_STAMP_RE = re.compile(r"\[{}\]".format(BASE_TIME_STAMP_RE))
@@ -208,12 +206,57 @@ class Headline:
             return
 
         if m := PLANNING_RE.match(planning_line.get_raw()):
+            self._planning_indendation = m.group("indentation")
+            self._planning_order = []
+
+            keywords = ["SCHEDULED", "CLOSED", "DEADLINE"]
+            plan = planning_line.get_raw().split("\n")[0]
+            indexes = [(kw, plan.find(kw)) for kw in keywords]
+
+            self._planning_order = [
+                kw
+                for (kw, idx) in sorted(
+                    filter(lambda v: v[1] >= 0, indexes), key=lambda v: v[1]
+                )
+            ]
+
             if scheduled := m.group("scheduled"):
                 self.scheduled = time_from_str(scheduled)
             if closed := m.group("closed"):
                 self.closed = time_from_str(closed)
             if deadline := m.group("deadline"):
                 self.deadline = time_from_str(deadline)
+
+            # Remove from contents
+            self._remove_element_in_line(start_line + 1)
+
+    def get_planning_line(self):
+        if self.scheduled is None and self.closed is None and self.deadline is None:
+            return None
+
+        contents = [self._planning_indendation]
+
+        for el in self._planning_order:
+            if el == "SCHEDULED" and self.scheduled is not None:
+                contents.append("SCHEDULED: {} ".format(self.scheduled.to_raw()))
+
+            elif el == "CLOSED" and self.closed is not None:
+                contents.append("CLOSED: {} ".format(self.closed.to_raw()))
+
+            elif el == "DEADLINE" and self.deadline is not None:
+                contents.append("DEADLINE: {} ".format(self.deadline.to_raw()))
+
+        # Consider elements added (not present on planning order)
+        if ("SCHEDULED" not in self._planning_order) and (self.scheduled is not None):
+            contents.append("SCHEDULED: {} ".format(self.scheduled.to_raw()))
+
+        if ("CLOSED" not in self._planning_order) and (self.closed is not None):
+            contents.append("CLOSED: {} ".format(self.closed.to_raw()))
+
+        if ("DEADLINE" not in self._planning_order) and (self.deadline is not None):
+            contents.append("DEADLINE: {} ".format(self.deadline.to_raw()))
+
+        return "".join(contents).rstrip()
 
     @property
     def clock(self):
@@ -278,6 +321,27 @@ class Headline:
         for (s_lnum, struc) in self.structural:
             if linenum == s_lnum:
                 return ("structural", struc)
+
+    def _remove_element_in_line(self, linenum):
+        found = None
+        for i, line in enumerate(self.contents):
+            if linenum == line.linenum:
+                found = i
+                break
+
+        assert found is not None
+        el = self.contents[found]
+        assert isinstance(el, Text)
+
+        raw = el.get_raw()
+        if "\n" not in raw:
+            # Remove the element found
+            self.contents.pop(found)
+        else:
+            # Remove the first line
+            self.contents[found] = parse_content_block(
+                [RawLine(self.contents[found].linenum + 1, raw.split("\n", 1)[1])]
+            )
 
     def get_structural_end_after(self, linenum):
         for (s_lnum, struc) in self.structural:
@@ -376,9 +440,61 @@ Property = collections.namedtuple(
 
 # @TODO How are [YYYY-MM-DD HH:mm--HH:mm] and ([... HH:mm]--[... HH:mm]) differentiated ?
 # @TODO Consider recurrence annotations
-Timestamp = collections.namedtuple(
-    "Timestamp", ("active", "year", "month", "day", "dow", "hour", "minute")
-)
+class Timestamp:
+    def __init__(self, active, year, month, day, dow, hour, minute, repetition=None):
+        self.active = active
+        self._year = year
+        self._month = month
+        self._day = day
+        self.dow = dow
+        self.hour = hour
+        self.minute = minute
+        self.repetition = repetition
+
+    def __eq__(self, other):
+        if not isinstance(other, Timestamp):
+            return False
+        return (
+            (self.active == other.active)
+            and (self.year == other.year)
+            and (self.month == other.month)
+            and (self.day == other.day)
+            and (self.dow == other.dow)
+            and (self.hour == other.hour)
+            and (self.minute == other.minute)
+            and (self.repetition == other.repetition)
+        )
+
+    def __repr__(self):
+        return timestamp_to_string(self)
+
+    # Properties whose modification changes the Day-Of-Week
+    @property
+    def year(self):
+        return self._year
+
+    @year.setter
+    def year(self, value):
+        self._year = value
+        self.dow = None
+
+    @property
+    def month(self):
+        return self._month
+
+    @month.setter
+    def month(self, value):
+        self._month = value
+        self.dow = None
+
+    @property
+    def day(self):
+        return self._day
+
+    @day.setter
+    def day(self, value):
+        self._day = value
+        self.dow = None
 
 
 class DelimiterLineType(Enum):
@@ -495,13 +611,17 @@ def parse_org_time(value):
         m.group("dow"),
         int(m.group("start_hour")) if m.group("start_hour") else None,
         int(m.group("start_minute")) if m.group("start_minute") else None,
+        m.group("repetition").strip() if m.group("repetition") else None,
     )
 
 
 class OrgTime:
     def __init__(self, ts: Timestamp):
+        assert ts is not None
         self.time = ts
-        self.date = date(ts.year, ts.month, ts.day)
+
+    def to_raw(self):
+        return timestamp_to_string(self.time)
 
 
 def time_from_str(s: str):
@@ -525,6 +645,9 @@ def timestamp_to_string(ts: Timestamp):
         )
     else:
         base = date
+
+    if ts.repetition:
+        base = base + " " + ts.repetition
 
     if ts.active:
         return "<{}>".format(base)
@@ -1078,6 +1201,10 @@ class OrgDoc:
         yield "*" * headline.depth + " " + state + headline.orig.group(
             "spacing"
         ) + headline.title + tags
+
+        planning = headline.get_planning_line()
+        if planning is not None:
+            yield planning
 
         lines = []
         KW_T = 0
