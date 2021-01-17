@@ -409,6 +409,15 @@ class TestSerde(unittest.TestCase):
             hl.deadline.time, Timestamp(True, 2020, 12, 14, "Lun", None, None)
         )
 
+        hl_schedule_range = hl.children[0]
+        self.assertEqual(
+            hl_schedule_range.scheduled.time, Timestamp(True, 2020, 12, 15, "Mar", 0, 5)
+        )
+        self.assertEqual(
+            hl_schedule_range.scheduled.end_time,
+            Timestamp(True, 2020, 12, 15, "Mar", 0, 10),
+        )
+
     def test_update_info_file_05(self):
         with open(os.path.join(DIR, "05-dates.org")) as f:
             orig = f.read()

@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import collections
 import difflib
 import logging
@@ -54,8 +56,8 @@ NODE_PROPERTIES_RE = re.compile(
     r"^(?P<indentation>\s*):(?P<key>[^+:]+)(?P<plus>\+)?:(?P<spacing>\s*)(?P<value>.+)$"
 )
 RAW_LINE_RE = re.compile(r"^\s*([^\s#:*]|$)")
-BASE_TIME_STAMP_RE = r"(?P<year>\d{4})-(?P<month>\d{2})-(?P<day>\d{2})( ?(?P<dow>[^ ]+))?( (?P<start_hour>\d{1,2}):(?P<start_minute>\d{1,2})(--(?P<end_hour>\d{1,2}):(?P<end_minute>\d{1,2}))?)?(?P<repetition> (?P<rep_mark>(\+|\+\+|\.\+|-|--))(?P<rep_value>\d+)(?P<rep_unit>[hdwmy]))?"
-CLEAN_TIME_STAMP_RE = r"\d{4}-\d{2}-\d{2}( ?([^ ]+))?( (\d{1,2}):(\d{1,2})(--(\d{1,2}):(\d{1,2}))?)?( (\+|\+\+|\.\+|-|--)\d+[hdwmy])?"
+BASE_TIME_STAMP_RE = r"(?P<year>\d{4})-(?P<month>\d{2})-(?P<day>\d{2})( ?(?P<dow>[^ ]+))?( (?P<start_hour>\d{1,2}):(?P<start_minute>\d{1,2})(-+(?P<end_hour>\d{1,2}):(?P<end_minute>\d{1,2}))?)?(?P<repetition> (?P<rep_mark>(\+|\+\+|\.\+|-|--))(?P<rep_value>\d+)(?P<rep_unit>[hdwmy]))?"
+CLEAN_TIME_STAMP_RE = r"\d{4}-\d{2}-\d{2}( ?([^ ]+))?( (\d{1,2}):(\d{1,2})(-+(\d{1,2}):(\d{1,2}))?)?( (\+|\+\+|\.\+|-|--)\d+[hdwmy])?"
 
 ACTIVE_TIME_STAMP_RE = re.compile(r"<{}>".format(BASE_TIME_STAMP_RE))
 INACTIVE_TIME_STAMP_RE = re.compile(r"\[{}\]".format(BASE_TIME_STAMP_RE))
@@ -275,7 +277,7 @@ class Headline:
                     as_time_range = parse_org_time_range(start, end)
                     parsed = as_time_range
                 else:
-                    parsed = parse_org_time(time_seg)
+                    parsed = OrgTime.parse(time_seg)
                 times.append(parsed)
 
         return times
@@ -451,6 +453,9 @@ class Timestamp:
         self.minute = minute
         self.repetition = repetition
 
+    def to_datetime(self) -> datetime:
+        return datetime(self.year, self.month, self.day, self.hour, self.minute)
+
     def __eq__(self, other):
         if not isinstance(other, Timestamp):
             return False
@@ -550,7 +555,7 @@ def token_from_type(tok_type):
 
 
 class TimeRange:
-    def __init__(self, start_time, end_time):
+    def __init__(self, start_time: OrgTime, end_time: OrgTime):
         self.start_time = start_time
         self.end_time = end_time
 
@@ -570,69 +575,76 @@ class TimeRange:
         return datetime(et.year, et.month, et.day, et.hour or 0, et.minute or 0)
 
 
-def parse_org_time_range(start, end):
-    return TimeRange(parse_org_time(start), parse_org_time(end))
-
-
-def parse_org_time(value):
-    if m := ACTIVE_TIME_STAMP_RE.match(value):
-        active = True
-    elif m := INACTIVE_TIME_STAMP_RE.match(value):
-        active = False
-    else:
-        return None
-
-    if m.group("end_hour"):
-        return TimeRange(
-            Timestamp(
-                active,
-                int(m.group("year")),
-                int(m.group("month")),
-                int(m.group("day")),
-                m.group("dow"),
-                int(m.group("start_hour")),
-                int(m.group("start_minute")),
-            ),
-            Timestamp(
-                active,
-                int(m.group("year")),
-                int(m.group("month")),
-                int(m.group("day")),
-                m.group("dow"),
-                int(m.group("end_hour")),
-                int(m.group("end_minute")),
-            ),
-        )
-    return Timestamp(
-        active,
-        int(m.group("year")),
-        int(m.group("month")),
-        int(m.group("day")),
-        m.group("dow"),
-        int(m.group("start_hour")) if m.group("start_hour") else None,
-        int(m.group("start_minute")) if m.group("start_minute") else None,
-        m.group("repetition").strip() if m.group("repetition") else None,
-    )
+def parse_org_time_range(start, end) -> TimeRange:
+    return TimeRange(OrgTime.parse(start), OrgTime.parse(end))
 
 
 class OrgTime:
-    def __init__(self, ts: Timestamp):
+    def __init__(self, ts: Timestamp, end_time: Union[Timestamp, None] = None):
         assert ts is not None
         self.time = ts
+        self.end_time = end_time
 
     def to_raw(self):
-        return timestamp_to_string(self.time)
+        return timestamp_to_string(self.time, self.end_time)
+
+    def __repr__(self):
+        return f"OrgTime({self.to_raw()})"
+
+    @classmethod
+    def parse(self, value: str) -> OrgTime:
+        if m := ACTIVE_TIME_STAMP_RE.match(value):
+            active = True
+        elif m := INACTIVE_TIME_STAMP_RE.match(value):
+            active = False
+        else:
+            return None
+
+        if m.group("end_hour"):
+            return OrgTime(
+                Timestamp(
+                    active,
+                    int(m.group("year")),
+                    int(m.group("month")),
+                    int(m.group("day")),
+                    m.group("dow"),
+                    int(m.group("start_hour")),
+                    int(m.group("start_minute")),
+                ),
+                Timestamp(
+                    active,
+                    int(m.group("year")),
+                    int(m.group("month")),
+                    int(m.group("day")),
+                    m.group("dow"),
+                    int(m.group("end_hour")),
+                    int(m.group("end_minute")),
+                ),
+            )
+
+        return OrgTime(
+            Timestamp(
+                active,
+                int(m.group("year")),
+                int(m.group("month")),
+                int(m.group("day")),
+                m.group("dow"),
+                int(m.group("start_hour")) if m.group("start_hour") else None,
+                int(m.group("start_minute")) if m.group("start_minute") else None,
+                m.group("repetition").strip() if m.group("repetition") else None,
+            )
+        )
 
 
-def time_from_str(s: str):
-    return OrgTime(parse_org_time(s))
+def time_from_str(s: str) -> OrgTime:
+    return OrgTime.parse(s)
 
 
 def timerange_to_string(tr: TimeRange):
-    return timestamp_to_string(tr.start_time) + "--" + timestamp_to_string(tr.end_time)
+    return tr.start_time.to_raw() + "--" + tr.end_time.to_raw()
 
 
-def timestamp_to_string(ts: Timestamp):
+def timestamp_to_string(ts: Timestamp, end_time: Union[Timestamp, None] = None) -> str:
     date = "{year}-{month:02d}-{day:02d}".format(
         year=ts.year, month=ts.month, day=ts.day
     )
@@ -645,6 +657,13 @@ def timestamp_to_string(ts: Timestamp):
         )
     else:
         base = date
+
+    if end_time is not None:
+        assert end_time.hour is not None
+        assert end_time.minute is not None
+        base = "{base}-{hour:02}:{minute:02d}".format(
+            base=base, hour=end_time.hour, minute=end_time.minute
+        )
 
     if ts.repetition:
         base = base + " " + ts.repetition
@@ -1164,10 +1183,10 @@ class OrgDoc:
         if plus is None:
             plus = ""
 
-        if isinstance(prop.value, Timestamp):
-            value = timestamp_to_string(prop.value)
-        elif isinstance(prop.value, TimeRange):
+        if isinstance(prop.value, TimeRange):
             value = timerange_to_string(prop.value)
+        elif isinstance(prop.value, OrgTime):
+            value = prop.value.to_raw()
         else:
             value = prop.value
 
@@ -1392,7 +1411,7 @@ class OrgDocReader:
                 value = as_time_range
             else:
                 raise Exception("Unknown time range format: {}".format(value))
-        elif as_time := parse_org_time(value):
+        elif as_time := OrgTime.parse(value):
             value = as_time
 
         try:

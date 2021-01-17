@@ -7,7 +7,7 @@ from org_rw import (Bold, Code, Italic, Line, Strike, Text, Underlined,
 
 
 def timestamp_to_datetime(ts):
-    return datetime(ts.year, ts.month, ts.day, ts.hour, ts.minute)
+    return ts.time.to_datetime()
 
 
 def get_raw(doc):
