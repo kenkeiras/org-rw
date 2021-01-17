@@ -48,7 +48,7 @@ BASE_ENVIRONMENT = {
 DEFAULT_TODO_KEYWORDS = ["TODO"]
 DEFAULT_DONE_KEYWORDS = ["DONE"]
 
-HEADLINE_TAGS_RE = re.compile(r"((:[a-zA-Z0-9_@#%]+)+:)\s*$")
+HEADLINE_TAGS_RE = re.compile(r"((:(\w|[0-9_@#%])+)+:)\s*$")
 HEADLINE_RE = re.compile(r"^(?P<stars>\*+)(?P<spacing>\s*)(?P<line>.*?)$")
 KEYWORDS_RE = re.compile(
     r"^(?P<indentation>\s*)#\+(?P<key>[^:\[]+)(\[(?P<options>[^\]]*)\])?:(?P<spacing>\s*)(?P<value>.*)$"
