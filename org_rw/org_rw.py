@@ -8,7 +8,7 @@ import re
 import sys
 from datetime import date, datetime, timedelta
 from enum import Enum
-from typing import List, Tuple, Union
+from typing import Generator, List, Tuple, Union
 
 BASE_ENVIRONMENT = {
     "org-footnote-section": "Footnotes",
@@ -45,8 +45,11 @@ BASE_ENVIRONMENT = {
     ),
 }
 
+DEFAULT_TODO_KEYWORDS = ["TODO"]
+DEFAULT_DONE_KEYWORDS = ["DONE"]
+
 HEADLINE_TAGS_RE = re.compile(r"((:[a-zA-Z0-9_@#%]+)+:)\s*$")
-HEADLINE_RE = re.compile(r"^(?P<stars>\*+) (?P<spacing>\s*)(?P<line>.*?)$")
+HEADLINE_RE = re.compile(r"^(?P<stars>\*+)(?P<spacing>\s*)(?P<line>.*?)$")
 KEYWORDS_RE = re.compile(
     r"^(?P<indentation>\s*)#\+(?P<key>[^:\[]+)(\[(?P<options>[^\]]*)\])?:(?P<spacing>\s*)(?P<value>.*)$"
 )
@@ -182,6 +185,7 @@ class Headline:
         parent,
         is_todo,
         is_done,
+        spacing,
     ):
         self.start_line = start_line
         self.depth = depth
@@ -205,6 +209,7 @@ class Headline:
         self.scheduled = None
         self.deadline = None
         self.closed = None
+        self.spacing = spacing
 
         # Read planning line
         planning_line = self.get_element_in_line(start_line + 1)
@@ -459,8 +464,11 @@ class Timestamp:
         self.minute = minute
         self.repetition = repetition
 
-    def to_datetime(self) -> datetime:
-        return datetime(self.year, self.month, self.day, self.hour, self.minute)
+    def to_datetime(self) -> Union[datetime, date]:
+        if self.hour is not None:
+            return datetime(self.year, self.month, self.day, self.hour, self.minute)
+        else:
+            return datetime(self.year, self.month, self.day, 0, 0)
 
     def __eq__(self, other):
         if not isinstance(other, Timestamp):
@@ -1089,6 +1097,7 @@ def dump_contents(raw):
 def parse_headline(hl, doc, parent) -> Headline:
     stars = hl["orig"].group("stars")
     depth = len(stars)
+    spacing = hl["orig"].group("spacing")
 
     # TODO: Parse line for priority, cookies and tags
     line = hl["orig"].group("line")
@@ -1139,6 +1148,7 @@ def parse_headline(hl, doc, parent) -> Headline:
         parent=parent,
         is_todo=is_todo,
         is_done=is_done,
+        spacing=spacing,
     )
 
     headline.children = [
@@ -1149,8 +1159,8 @@ def parse_headline(hl, doc, parent) -> Headline:
 
 class OrgDoc:
     def __init__(self, headlines, keywords, contents):
-        self.todo_keywords = None
-        self.done_keywords = None
+        self.todo_keywords = DEFAULT_TODO_KEYWORDS
+        self.done_keywords = DEFAULT_DONE_KEYWORDS
 
         for keyword in keywords:
             if keyword.key == "TODO":
@@ -1183,6 +1193,14 @@ class OrgDoc:
 
     def getTopHeadlines(self):
         return self.headlines
+
+    def getAllHeadlines(self) -> Generator[Headline]:
+        todo = self.headlines[::-1]  # We go backwards, to pop/append and go depth-first
+        while len(todo) != 0:
+            hl = todo.pop()
+            todo.extend(hl.children[::-1])
+
+            yield hl
 
     def get_code_snippets(self):
         for headline in self.headlines:
@@ -1244,9 +1262,7 @@ class OrgDoc:
         if headline.state:
             state = headline.state + " "
 
-        yield "*" * headline.depth + " " + state + headline.orig.group(
-            "spacing"
-        ) + headline.title + tags
+        yield "*" * headline.depth + headline.spacing + state + headline.title + tags
 
         planning = headline.get_planning_line()
         if planning is not None:
