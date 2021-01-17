@@ -65,13 +65,19 @@ PLANNING_RE = re.compile(
     r"(?P<indentation>\s*)"
     + r"(SCHEDULED:\s*(?P<scheduled>[<\[]"
     + CLEAN_TIME_STAMP_RE
-    + r"[>\]])\s*"
+    + r"[>\]](--[<\[]"
+    + CLEAN_TIME_STAMP_RE
+    + r"[>\]])?)\s*"
     + r"|CLOSED:\s*(?P<closed>[<\[]"
     + CLEAN_TIME_STAMP_RE
-    + r"[>\]])\s*"
+    + r"[>\]](--[<\[]"
+    + CLEAN_TIME_STAMP_RE
+    + r"[>\]])?)\s*"
     + r"|DEADLINE:\s*(?P<deadline>[<\[]"
     + CLEAN_TIME_STAMP_RE
-    + r"[>\]])\s*"
+    + r"[>\]](--[<\[]"
+    + CLEAN_TIME_STAMP_RE
+    + r"[>\]])?)\s*"
     r")+\s*"
 )
 
@@ -223,11 +229,11 @@ class Headline:
             ]
 
             if scheduled := m.group("scheduled"):
-                self.scheduled = time_from_str(scheduled)
+                self.scheduled = parse_time(scheduled)
             if closed := m.group("closed"):
-                self.closed = time_from_str(closed)
+                self.closed = parse_time(closed)
             if deadline := m.group("deadline"):
-                self.deadline = time_from_str(deadline)
+                self.deadline = parse_time(deadline)
 
             # Remove from contents
             self._remove_element_in_line(start_line + 1)
@@ -559,6 +565,9 @@ class TimeRange:
         self.start_time = start_time
         self.end_time = end_time
 
+    def to_raw(self) -> str:
+        return timerange_to_string(self)
+
     @property
     def duration(self) -> timedelta:
         delta = self.end - self.start
@@ -573,6 +582,24 @@ class TimeRange:
     def end(self) -> datetime:
         et = self.end_time
         return datetime(et.year, et.month, et.day, et.hour or 0, et.minute or 0)
+
+
+def parse_time(value: str) -> Union[None, TimeRange, OrgTime]:
+    if (value.count(">--<") == 1) or (value.count("]--[") == 1):
+        # Time ranges with two different dates
+        # @TODO properly consider "=> DURATION" section
+        start, end = value.split("=")[0].split("--")
+        as_time_range = parse_org_time_range(start, end)
+        if (as_time_range.start_time is not None) and (
+            as_time_range.end_time is not None
+        ):
+            return as_time_range
+        else:
+            raise Exception("Unknown time range format: {}".format(value))
+    elif as_time := OrgTime.parse(value):
+        return as_time
+    else:
+        return None
 
 
 def parse_org_time_range(start, end) -> TimeRange:
@@ -1400,18 +1427,7 @@ class OrgDocReader:
         key = match.group("key")
         value = match.group("value").strip()
 
-        if (value.count(">--<") == 1) or (value.count("]--[") == 1):
-            # Time ranges with two different dates
-            # @TODO properly consider "=> DURATION" section
-            start, end = value.split("=")[0].split("--")
-            as_time_range = parse_org_time_range(start, end)
-            if (as_time_range.start_time is not None) and (
-                as_time_range.end_time is not None
-            ):
-                value = as_time_range
-            else:
-                raise Exception("Unknown time range format: {}".format(value))
-        elif as_time := OrgTime.parse(value):
+        if as_time := parse_time(value):
             value = as_time
 
         try:
