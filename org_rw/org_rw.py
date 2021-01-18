@@ -587,13 +587,11 @@ class TimeRange:
 
     @property
     def start(self) -> datetime:
-        st = self.start_time
-        return datetime(st.year, st.month, st.day, st.hour or 0, st.minute or 0)
+        return self.start_time.time.to_datetime()
 
     @property
     def end(self) -> datetime:
-        et = self.end_time
-        return datetime(et.year, et.month, et.day, et.hour or 0, et.minute or 0)
+        return self.end_time.time.to_datetime()
 
 
 def parse_time(value: str) -> Union[None, TimeRange, OrgTime]:
@@ -623,6 +621,13 @@ class OrgTime:
         assert ts is not None
         self.time = ts
         self.end_time = end_time
+
+    @property
+    def duration(self):
+        if self.end_time is None:
+            return timedelta()  # No duration
+        else:
+            return self.end_time.to_datetime() - self.time.to_datetime()
 
     def to_raw(self):
         return timestamp_to_string(self.time, self.end_time)
