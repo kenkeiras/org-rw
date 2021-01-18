@@ -272,6 +272,10 @@ class Headline:
         return "".join(contents).rstrip()
 
     @property
+    def id(self):
+        return self.get_property("ID")
+
+    @property
     def clock(self):
         times = []
         for chunk in self.contents:
