@@ -474,6 +474,23 @@ class Timestamp:
         else:
             return datetime(self.year, self.month, self.day, 0, 0)
 
+    def __add__(self, delta: timedelta):
+        as_dt = self.to_datetime()
+        to_dt = as_dt + delta
+
+        return Timestamp(
+            self.active,
+            year=to_dt.year,
+            month=to_dt.month,
+            day=to_dt.day,
+            dow=None,
+            hour=to_dt.hour if self.hour is not None or to_dt.hour != 0 else None,
+            minute=to_dt.minute
+            if self.minute is not None or to_dt.minute != 0
+            else None,
+            repetition=self.repetition,
+        )
+
     def __eq__(self, other):
         if not isinstance(other, Timestamp):
             return False
