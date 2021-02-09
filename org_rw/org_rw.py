@@ -83,15 +83,15 @@ PLANNING_RE = re.compile(
     + r"[>\]])?)\s*"
     r")+\s*"
 )
+LIST_ITEM_RE = re.compile(
+    r"(?P<indentation>\s*)((?P<bullet>[*\-+])|((?P<counter>\d|[a-zA-Z])(?P<counter_sep>[.)])))((?P<checkbox_indentation>)\[(?P<checkbox_value>[ Xx])\])?((?P<tag_indentation>\s*)(?P<tag>.*?)::)?(?P<content>.*)"
+)
 
 # Org-Babel
 BEGIN_SRC_RE = re.compile(r"^\s*#\+BEGIN_SRC(?P<content>.*)$", re.I)
 END_SRC_RE = re.compile(r"^\s*#\+END_SRC\s*$", re.I)
 RESULTS_DRAWER_RE = re.compile(r"^\s*:results:\s*$", re.I)
 CodeSnippet = collections.namedtuple("CodeSnippet", ("name", "content", "result"))
-
-# BASE_TIME_RANGE_RE = (r'(?P<start_year>\d{4})-(?P<start_month>\d{2})-(?P<start_day>\d{2}) (?P<start_dow>[^ ]+)((?P<start_hour>\d{1,2}):(?P<start_minute>\d{1,2}))?',
-#                       r'(?P<end_year>\d{4})-(?P<end_month>\d{2})-(?P<end_day>\d{2}) (?P<end_dow>[^ ]+)((?P<end_hour>\d{1,2}):(?P<end_minute>\d{1,2}))?')
 
 
 def get_tokens(value):
@@ -182,6 +182,7 @@ class Headline:
         children,
         structural,
         delimiters,
+        list_items,
         parent,
         is_todo,
         is_done,
@@ -203,6 +204,7 @@ class Headline:
         self.children = children
         self.structural = structural
         self.delimiters = delimiters
+        self.list_items = list_items
         self.parent = parent
         self.is_todo = is_todo
         self.is_done = is_done
@@ -242,6 +244,19 @@ class Headline:
 
             # Remove from contents
             self._remove_element_in_line(start_line + 1)
+
+    def getLists(self):
+        lists = []
+        last_line = None
+
+        for li in self.list_items:
+            if last_line == li.linenum - 1:
+                lists[-1].append(li)
+            else:
+                lists.append([li])
+
+            last_line = li.linenum
+        return lists
 
     def get_planning_line(self):
         if self.scheduled is None and self.closed is None and self.deadline is None:
@@ -453,6 +468,23 @@ Keyword = collections.namedtuple(
 )
 Property = collections.namedtuple(
     "Property", ("linenum", "match", "key", "value", "options")
+)
+
+ListItem = collections.namedtuple(
+    "ListItem",
+    (
+        "linenum",
+        "match",
+        "indentation",
+        "bullet",
+        "counter",
+        "counter_sep",
+        "checkbox_indentation",
+        "checkbox_value",
+        "tag_indentation",
+        "tag",
+        "content",
+    ),
 )
 
 # @TODO How are [YYYY-MM-DD HH:mm--HH:mm] and ([... HH:mm]--[... HH:mm]) differentiated ?
@@ -1117,6 +1149,9 @@ def dump_contents(raw):
     if isinstance(raw, RawLine):
         return (raw.linenum, raw.line)
 
+    elif isinstance(raw, ListItem):
+        return (raw.linenum, raw.match.group(0))
+
     return (raw.linenum, raw.get_raw())
 
 
@@ -1166,6 +1201,7 @@ def parse_headline(hl, doc, parent) -> Headline:
         properties=hl["properties"],
         structural=hl["structural"],
         delimiters=hl["delimiters"],
+        list_items=hl["list_items"],
         title_start=None,
         priority=None,
         priority_start=None,
@@ -1305,6 +1341,9 @@ class OrgDoc:
         for content in headline.contents:
             lines.append((CONTENT_T, dump_contents(content)))
 
+        for li in headline.list_items:
+            lines.append((CONTENT_T, dump_contents(li)))
+
         for prop in headline.properties:
             lines.append((PROPERTIES_T, self.dump_property(prop)))
 
@@ -1378,6 +1417,7 @@ class OrgDocReader:
         self.headline_hierarchy: List[OrgDoc] = []
         self.contents: List[RawLine] = []
         self.delimiters: List[DelimiterLine] = []
+        self.list_items: List[ListItem] = []
 
     def finalize(self):
         return OrgDoc(self.headlines, self.keywords, self.contents)
@@ -1400,6 +1440,7 @@ class OrgDocReader:
             "structural": [],
             "delimiters": [],
             "results": [],  # TODO: Move to each specific code block?
+            "list_items": [],
         }
 
         while (depth - 2) > len(self.headline_hierarchy):
@@ -1413,6 +1454,26 @@ class OrgDocReader:
         else:
             self.headline_hierarchy[-1]["children"].append(headline)
         self.headline_hierarchy.append(headline)
+
+    def add_list_item_line(self, linenum: int, match: re.Match) -> int:
+        li = ListItem(
+            linenum,
+            match,
+            match.group("indentation"),
+            match.group("bullet"),
+            match.group("counter"),
+            match.group("counter_sep"),
+            match.group("checkbox_indentation"),
+            match.group("checkbox_value"),
+            match.group("tag_indentation"),
+            match.group("tag"),
+            match.group("content"),
+        )
+
+        if len(self.headline_hierarchy) == 0:
+            self.list_items.append(li)
+        else:
+            self.headline_hierarchy[-1]["list_items"].append(li)
 
     def add_keyword_line(self, linenum: int, match: re.Match) -> int:
         options = match.group("options")
@@ -1490,10 +1551,12 @@ class OrgDocReader:
         for lnum, line in reader:
             linenum = lnum + 1
             try:
-                if m := RAW_LINE_RE.match(line):
-                    self.add_raw_line(linenum, line)
-                elif m := HEADLINE_RE.match(line):
+                if m := HEADLINE_RE.match(line):
                     self.add_headline(linenum, m)
+                elif m := LIST_ITEM_RE.match(line):
+                    self.add_list_item_line(linenum, m)
+                elif m := RAW_LINE_RE.match(line):
+                    self.add_raw_line(linenum, line)
                 # Org-babel
                 elif m := BEGIN_SRC_RE.match(line):
                     self.add_begin_src_line(linenum, m)

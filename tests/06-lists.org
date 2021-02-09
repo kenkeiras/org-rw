@@ -1,0 +1,39 @@
+#+TITLE: 06-Links
+#+DESCRIPTION: Simple org file to test links
+#+TODO: TODO(t) PAUSED(p) |  DONE(d)
+
+
+* Simple lists
+  :PROPERTIES:
+  :ID:       06-lists-simple
+  :CREATED:  [2020-01-01 Wed 01:01]
+  :END:
+
+  - This is a simple list.
+  - This list has multiple elements, with _markup_.
+
+Also represented as
+
+  + This is a simple list.
+  + This list has multiple elements, with _markup_.
+
+Also represented as
+
+  * This is a simple list.
+  * This list has multiple elements, with _markup_.
+
+
+* Numbered lists
+  :PROPERTIES:
+  :ID:       06-lists-numbered
+  :CREATED:  [2020-01-01 Wed 01:01]
+  :END:
+
+
+  1. First element
+  2. Second element
+
+Also represented as
+
+  1) First element
+  2) Second element

@@ -442,3 +442,20 @@ class TestSerde(unittest.TestCase):
         self.assertEqual(
             hl.deadline.time, Timestamp(True, 2020, 12, 17, None, None, None)
         )
+
+    def test_mimic_write_file_06(self):
+        with open(os.path.join(DIR, "06-lists.org")) as f:
+            orig = f.read()
+            doc = loads(orig)
+
+        self.assertEqual(dumps(doc), orig)
+
+    def test_structure_file_06(self):
+        with open(os.path.join(DIR, "06-lists.org")) as f:
+            orig = f.read()
+            doc = loads(orig)
+
+        hl = doc.getTopHeadlines()[0]
+        # ...
+        lists = hl.getLists()
+        self.assertEqual(len(lists), 3)
