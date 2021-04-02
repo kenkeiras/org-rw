@@ -1251,7 +1251,7 @@ def parse_headline(hl, doc, parent) -> Headline:
 
 
 class OrgDoc:
-    def __init__(self, headlines, keywords, contents):
+    def __init__(self, headlines, keywords, contents, list_items):
         self.todo_keywords = DEFAULT_TODO_KEYWORDS
         self.done_keywords = DEFAULT_DONE_KEYWORDS
 
@@ -1264,6 +1264,7 @@ class OrgDoc:
 
         self.keywords: List[Property] = keywords
         self.contents: List[RawLine] = contents
+        self.list_items: List[ListItem] = list_items
         self._path = None
         self.headlines: List[Headline] = list(
             map(lambda hl: parse_headline(hl, self, self), headlines)
@@ -1317,9 +1318,15 @@ class OrgDoc:
         )
 
     def dump_property(self, prop: Property):
-        plus = prop.match.group("plus")
-        if plus is None:
-            plus = ""
+        plus = ""
+        indentation = ""
+        spacing = " "
+        if prop.match is not None:
+            plus = prop.match.group("plus")
+            if plus is None:
+                plus = ""
+            indentation = prop.match.group("indentation")
+            spacing = prop.match.group("spacing")
 
         if isinstance(prop.value, TimeRange):
             value = timerange_to_string(prop.value)
@@ -1331,10 +1338,10 @@ class OrgDoc:
         return (
             prop.linenum,
             "{indentation}:{key}{plus}:{spacing}{value}".format(
-                indentation=prop.match.group("indentation"),
+                indentation=indentation,
                 key=prop.key,
                 plus=plus,
-                spacing=prop.match.group("spacing"),
+                spacing=spacing,
                 value=value,
             ),
         )
@@ -1435,6 +1442,9 @@ class OrgDoc:
         for line in self.contents:
             lines.append(dump_contents(line))
 
+        for li in self.list_items:
+            lines.append(dump_contents(li))
+
         yield from map(lambda x: x[1], sorted(lines, key=lambda x: x[0]))
 
         for headline in self.headlines:
@@ -1451,7 +1461,7 @@ class OrgDocReader:
         self.list_items: List[ListItem] = []
 
     def finalize(self):
-        return OrgDoc(self.headlines, self.keywords, self.contents)
+        return OrgDoc(self.headlines, self.keywords, self.contents, self.list_items)
 
     ## Construction
     def add_headline(self, linenum: int, match: re.Match) -> int:

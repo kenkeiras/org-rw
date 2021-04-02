@@ -459,3 +459,32 @@ class TestSerde(unittest.TestCase):
         # ...
         lists = hl.getLists()
         self.assertEqual(len(lists), 3)
+        self.assertEqual(lists[0][0].content, " This is a simple list.")
+        self.assertEqual(lists[0][0].bullet, "-")
+        self.assertEqual(
+            lists[0][1].content, " This list has multiple elements, with _markup_."
+        )
+
+        self.assertEqual(lists[1][0].content, " This is a simple list.")
+        self.assertEqual(lists[1][0].bullet, "+")
+
+        hl2 = doc.getTopHeadlines()[1]
+        # ...
+        lists2 = hl2.getLists()
+        self.assertEqual(len(lists2), 2)
+
+        self.assertEqual(lists2[0][0].content, " First element")
+        self.assertEqual(lists2[0][0].counter, "1")
+        self.assertEqual(lists2[0][0].counter_sep, ".")
+
+        self.assertEqual(lists2[0][1].content, " Second element")
+        self.assertEqual(lists2[0][1].counter, "2")
+        self.assertEqual(lists2[0][1].counter_sep, ".")
+
+        self.assertEqual(lists2[1][0].content, " First element")
+        self.assertEqual(lists2[1][0].counter, "1")
+        self.assertEqual(lists2[1][0].counter_sep, ")")
+
+        self.assertEqual(lists2[1][1].content, " Second element")
+        self.assertEqual(lists2[1][1].counter, "2")
+        self.assertEqual(lists2[1][1].counter_sep, ")")
