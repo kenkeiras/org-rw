@@ -1,3 +1,5 @@
+import uuid
+
 from .org_rw import (Bold, Code, Headline, Italic, Line, RawLine, Strike, Text,
                      Underlined, Verbatim)
 
@@ -36,3 +38,7 @@ def get_raw_contents(doc) -> str:
         return doc.get_raw()
     print("Unhandled type: " + str(doc))
     raise NotImplementedError("Unhandled type: " + str(doc))
+
+
+def random_id() -> str:
+    return str(uuid.uuid4())

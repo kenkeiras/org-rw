@@ -290,6 +290,10 @@ class Headline:
     def id(self):
         return self.get_property("ID")
 
+    @id.setter
+    def id(self, value):
+        self.set_property("ID", value)
+
     @property
     def clock(self):
         times = []
@@ -325,6 +329,33 @@ class Headline:
                 return prop.value
 
         return default
+
+    def set_property(self, name: str, value: str):
+        for prop in self.properties:
+
+            # A matching property is found, update it
+            if prop.key == name:
+                prop.value = value
+                return
+
+        # No matching property found, add it
+        else:
+            if len(self.properties) > 0:
+                last_prop = self.properties[-1]
+                last_line = last_prop.linenum
+                last_match = last_prop.match
+            else:
+                last_line = 0
+                last_match = None
+            self.properties.append(
+                Property(
+                    linenum=last_line,
+                    match=last_match,
+                    key=name,
+                    value=value,
+                    options=None,
+                )
+            )
 
     def get_links(self):
         for content in self.contents:
