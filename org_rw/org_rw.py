@@ -568,6 +568,16 @@ class Timestamp:
             and (self.repetition == other.repetition)
         )
 
+    def __lt__(self, other):
+        if not isinstance(other, Timestamp):
+            return False
+        return self.to_datetime() < other.to_datetime()
+
+    def __gt__(self, other):
+        if not isinstance(other, Timestamp):
+            return False
+        return self.to_datetime() > other.to_datetime()
+
     def __repr__(self):
         return timestamp_to_string(self)
 
