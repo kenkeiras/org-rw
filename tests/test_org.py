@@ -488,3 +488,15 @@ class TestSerde(unittest.TestCase):
         self.assertEqual(lists2[1][1].content, " Second element")
         self.assertEqual(lists2[1][1].counter, "2")
         self.assertEqual(lists2[1][1].counter_sep, ")")
+
+    def test_org_roam_07(self):
+        with open(os.path.join(DIR, "07-org-roam-v2.org")) as f:
+            orig = f.read()
+            doc = loads(orig)
+
+        self.assertEqual(doc.get_property("ID"), "515054a9-ced8-4119-a844-71726f80dedf")
+
+        self.assertEqual(len(doc.getTopHeadlines()), 1)
+        hl = doc.getTopHeadlines()[0]
+        self.assertEqual(hl.get_property("ID"), "419f4651-21c8-4166-b8d5-692c34be9f93")
+        self.assertEqual(len(hl.children), 1)

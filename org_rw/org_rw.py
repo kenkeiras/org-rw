@@ -1261,7 +1261,9 @@ def parse_headline(hl, doc, parent) -> Headline:
 
 
 class OrgDoc:
-    def __init__(self, headlines, keywords, contents, list_items):
+    def __init__(
+        self, headlines, keywords, contents, list_items, structural, properties
+    ):
         self.todo_keywords = DEFAULT_TODO_KEYWORDS
         self.done_keywords = DEFAULT_DONE_KEYWORDS
 
@@ -1275,6 +1277,8 @@ class OrgDoc:
         self.keywords: List[Property] = keywords
         self.contents: List[RawLine] = contents
         self.list_items: List[ListItem] = list_items
+        self.structural: List = structural
+        self.properties: List = properties
         self._path = None
         self.headlines: List[Headline] = list(
             map(lambda hl: parse_headline(hl, self, self), headlines)
@@ -1292,8 +1296,15 @@ class OrgDoc:
         for content in self.contents:
             yield from get_links_from_content(content)
 
-    def get_property(self, name: str, default=None):
+    def get_keywords(self, name: str, default=None):
         for prop in self.keywords:
+            if prop.key == name:
+                return prop.value
+
+        return default
+
+    def get_property(self, name: str, default=None):
+        for prop in self.properties:
             if prop.key == name:
                 return prop.value
 
@@ -1453,6 +1464,12 @@ class OrgDoc:
 
     def dump(self):
         lines = []
+        for prop in self.properties:
+            lines.append(self.dump_property(prop))
+
+        for struct in self.structural:
+            lines.append(self.dump_structural(struct))
+
         for kw in self.keywords:
             lines.append(self.dump_kw(kw))
 
@@ -1476,9 +1493,18 @@ class OrgDocReader:
         self.contents: List[RawLine] = []
         self.delimiters: List[DelimiterLine] = []
         self.list_items: List[ListItem] = []
+        self.structural: List = []
+        self.properties: List = []
 
     def finalize(self):
-        return OrgDoc(self.headlines, self.keywords, self.contents, self.list_items)
+        return OrgDoc(
+            self.headlines,
+            self.keywords,
+            self.contents,
+            self.list_items,
+            self.structural,
+            self.properties,
+        )
 
     ## Construction
     def add_headline(self, linenum: int, match: re.Match) -> int:
@@ -1569,8 +1595,12 @@ class OrgDocReader:
             self.headline_hierarchy[-1]["delimiters"].append(line)
 
     def add_property_drawer_line(self, linenum: int, line: str, match: re.Match) -> int:
-        self.current_drawer = self.headline_hierarchy[-1]["properties"]
-        self.headline_hierarchy[-1]["structural"].append((linenum, line))
+        if len(self.headline_hierarchy) == 0:
+            self.current_drawer = self.properties
+            self.structural.append((linenum, line))
+        else:
+            self.current_drawer = self.headline_hierarchy[-1]["properties"]
+            self.headline_hierarchy[-1]["structural"].append((linenum, line))
 
     def add_results_drawer_line(self, linenum: int, line: str, match: re.Match) -> int:
         self.current_drawer = self.headline_hierarchy[-1]["results"]

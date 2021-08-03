@@ -1,0 +1,13 @@
+:PROPERTIES:
+:ID:       515054a9-ced8-4119-a844-71726f80dedf
+:END:
+#+title: 07-org-roam-v2
+
+* Subnode
+:PROPERTIES:
+:CREATED:  [2021-08-03 Mar 22:12]
+:ID:       419f4651-21c8-4166-b8d5-692c34be9f93
+:END:
+
+** Sub sub node
+- This has no ID
