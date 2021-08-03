@@ -99,6 +99,8 @@ def get_tokens(value):
         return value.contents
     if isinstance(value, RawLine):
         return [value.line]
+    if isinstance(value, list):
+        return value
     raise Exception("Unknown how to get tokens from: {}".format(value))
 
 
@@ -360,6 +362,10 @@ class Headline:
     def get_links(self):
         for content in self.contents:
             yield from get_links_from_content(content)
+
+        for lst in self.getLists():
+            for item in lst:
+                yield from get_links_from_content(item.content)
 
     def get_lines_between(self, start, end):
         for line in self.contents:
@@ -1551,7 +1557,9 @@ class OrgDocReader:
             match.group("checkbox_value"),
             match.group("tag_indentation"),
             match.group("tag"),
-            match.group("content"),
+            parse_content_block(
+                [RawLine(linenum=linenum, line=match.group("content"))]
+            ).contents,
         )
 
         if len(self.headline_hierarchy) == 0:
