@@ -1292,6 +1292,13 @@ class OrgDoc:
         for content in self.contents:
             yield from get_links_from_content(content)
 
+    def get_property(self, name: str, default=None):
+        for prop in self.keywords:
+            if prop.key == name:
+                return prop.value
+
+        return default
+
     def getProperties(self):
         return self.keywords
 
