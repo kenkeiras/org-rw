@@ -111,15 +111,19 @@ class RangeInRaw:
         self._end_id = id(end_token)
 
     def update_range(self, new_contents):
+        contents = self._content
+        if isinstance(self._content, Text):
+            contents = self._content.contents
+
         # Find start token
-        for start_idx, tok in enumerate(self._content.contents):
+        for start_idx, tok in enumerate(contents):
             if id(tok) == self._start_id:
                 break
         else:
             raise Exception("Start token not found")
 
         # Find end token
-        for offset, tok in enumerate(self._content.contents[start_idx:]):
+        for offset, tok in enumerate(contents[start_idx:]):
             if id(tok) == self._end_id:
                 break
         else:
@@ -127,11 +131,11 @@ class RangeInRaw:
 
         # Remove old contents
         for i in range(1, offset):
-            self._content.contents.pop(start_idx + 1)
+            contents.pop(start_idx + 1)
 
         # Add new ones
         for i, element in enumerate(new_contents):
-            self._content.contents.insert(start_idx + i + 1, element)
+            contents.insert(start_idx + i + 1, element)
 
 
 def get_links_from_content(content):
@@ -884,22 +888,26 @@ class Text:
         return "{{Text line: {}; content: {} }}".format(self.linenum, self.contents)
 
     def get_raw(self):
-        contents = []
-        for chunk in self.contents:
-            if isinstance(chunk, str):
-                contents.append(chunk)
-            elif isinstance(chunk, LinkToken):
-                if chunk.tok_type == LinkTokenType.OPEN_LINK:
-                    contents.append("[[")
-                elif chunk.tok_type == LinkTokenType.OPEN_DESCRIPTION:
-                    contents.append("][")
-                else:
-                    assert chunk.tok_type == LinkTokenType.CLOSE
-                    contents.append("]]")
+        return token_list_to_raw(self.contents)
+
+
+def token_list_to_raw(tok_list):
+    contents = []
+    for chunk in tok_list:
+        if isinstance(chunk, str):
+            contents.append(chunk)
+        elif isinstance(chunk, LinkToken):
+            if chunk.tok_type == LinkTokenType.OPEN_LINK:
+                contents.append("[[")
+            elif chunk.tok_type == LinkTokenType.OPEN_DESCRIPTION:
+                contents.append("][")
             else:
-                assert isinstance(chunk, MarkerToken)
-                contents.append(token_from_type(chunk.tok_type))
-        return "".join(contents)
+                assert chunk.tok_type == LinkTokenType.CLOSE
+                contents.append("]]")
+        else:
+            assert isinstance(chunk, MarkerToken)
+            contents.append(token_from_type(chunk.tok_type))
+    return "".join(contents)
 
 
 class Bold:
@@ -1197,7 +1205,14 @@ def dump_contents(raw):
         return (raw.linenum, raw.line)
 
     elif isinstance(raw, ListItem):
-        return (raw.linenum, raw.match.group(0))
+        bullet = raw.bullet if raw.bullet else raw.counter + raw.counter_sep
+        content = token_list_to_raw(raw.content)
+        checkbox = f"[{raw.checkbox_value}]" if raw.checkbox_value else ""
+        tag = f"{raw.tag_indentation}{raw.tag}::" if raw.tag else ""
+        return (
+            raw.linenum,
+            f"{raw.indentation}{bullet}{checkbox}{tag}{content}",
+        )
 
     return (raw.linenum, raw.get_raw())
 
