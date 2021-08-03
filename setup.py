@@ -2,7 +2,7 @@ from setuptools import setup
 
 setup(
     name="org-rw",
-    version="0.0.1",
+    version="0.0.1.dev1",
     description="Library to de/serialize org-files and manipulate them.",
     author="kenkeiras",
     author_email="kenkeiras@codigoparallevar.com",
