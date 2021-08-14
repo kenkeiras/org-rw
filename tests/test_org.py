@@ -507,3 +507,32 @@ class TestSerde(unittest.TestCase):
         hl = doc.getTopHeadlines()[0]
         self.assertEqual(hl.get_property("ID"), "419f4651-21c8-4166-b8d5-692c34be9f93")
         self.assertEqual(len(hl.children), 1)
+
+    def test_org_property_creation_08(self):
+        with open(os.path.join(DIR, "08-property-creation.org")) as f:
+            orig = f.read()
+            doc = loads(orig)
+
+        headline = doc.getTopHeadlines()[0]
+        headline.id = "first"
+
+        second = headline.children[0]
+        second.id = "second"
+
+        self.assertEqual(
+            dumps(doc).strip(),
+            """
+ #+TITLE: 08-Property-creation
+
+* Top headline
+:PROPERTIES:
+:ID: first
+:END:
+** Second headline
+:PROPERTIES:
+:ID: second
+:END:
+
+*** Third headline
+            """.strip(),
+        )

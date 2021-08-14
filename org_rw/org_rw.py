@@ -1472,6 +1472,20 @@ class OrgDoc:
             last_type = ltype
             structured_lines.append(content)
 
+        if last_type == PROPERTIES_T:
+            # No structural closing
+
+            indentation = 0
+            if len(lines) > 0:
+                last_line = lines[i - 1][1][1]
+                indentation = last_line.index(":")
+            structured_lines.append(" " * indentation + ":END:\n")
+            logging.warning(
+                "Added structural:{}: {}".format(
+                    line[1][0], structured_lines[-1].strip()
+                )
+            )
+
         if len(structured_lines) > 0:
             content = "".join(structured_lines)
 
