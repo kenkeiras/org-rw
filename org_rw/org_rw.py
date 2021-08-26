@@ -10,6 +10,8 @@ from datetime import date, datetime, timedelta
 from enum import Enum
 from typing import Generator, List, Tuple, Union
 
+from . import dom
+
 BASE_ENVIRONMENT = {
     "org-footnote-section": "Footnotes",
     "org-options-keywords": (
@@ -93,6 +95,9 @@ END_SRC_RE = re.compile(r"^\s*#\+END_SRC\s*$", re.I)
 RESULTS_DRAWER_RE = re.compile(r"^\s*:results:\s*$", re.I)
 CodeSnippet = collections.namedtuple("CodeSnippet", ("name", "content", "result"))
 
+# Groupings
+NON_FINISHED_GROUPS = (type(None), dom.ListGroupNode)
+
 
 def get_tokens(value):
     if isinstance(value, Text):
@@ -167,6 +172,19 @@ def get_links_from_content(content):
                 link_description.append(tok)
             else:
                 link_value.append(tok)
+
+
+def get_line(item):
+    if isinstance(item, Text):
+        return item.linenum
+    elif isinstance(item, ListItem):
+        return item.linenum
+    elif isinstance(item, Property):
+        return item.linenum
+    elif isinstance(item, tuple):
+        return item[0]
+    else:
+        raise Exception("Unknown item type: {}".format(item))
 
 
 class Headline:
@@ -250,6 +268,86 @@ class Headline:
 
             # Remove from contents
             self._remove_element_in_line(start_line + 1)
+
+    def as_dom(self):
+        everything = (
+            self.keywords
+            + self.contents
+            + self.list_items
+            + self.properties
+            + self.structural
+            + self.delimiters
+        )
+
+        tree = []
+        current_node = None
+
+        for line in sorted(everything, key=get_line):
+            # print("#-", current_node)
+            # print("=>", line)
+            if isinstance(line, Property):
+                assert isinstance(current_node, dom.PropertyDrawerNode)
+                current_node.append(dom.PropertyNode(line.key, line.value))
+
+            elif isinstance(line, Text):
+                if isinstance(current_node, dom.BlockNode):
+                    current_node.append(dom.Text(line))
+                elif isinstance(current_node, dom.LogbookDrawerNode):
+                    current_node.append(dom.Text(line))
+                else:
+                    assert type(current_node) in NON_FINISHED_GROUPS
+                    current_node = None
+                    tree.append(dom.Text(line))
+
+            elif isinstance(line, ListItem):
+                if current_node is None:
+                    current_node = dom.ListGroupNode()
+                    tree.append(current_node)
+                assert isinstance(current_node, dom.ListGroupNode)
+                current_node.append(dom.ListItem(line))
+
+            elif (
+                isinstance(line, DelimiterLine)
+                and line.delimiter_type == DelimiterLineType.BEGIN_SRC
+            ):
+                assert type(current_node) in NON_FINISHED_GROUPS
+                current_node = dom.CodeBlock(line)
+                current_node.append(current_node)
+
+            elif (
+                isinstance(line, DelimiterLine)
+                and line.delimiter_type == DelimiterLineType.END_SRC
+            ):
+                assert isinstance(current_node, dom.BlockNode)
+                current_node = None
+
+            elif (
+                isinstance(line, tuple)
+                and len(line) == 2
+                and isinstance(line[0], int)
+                and isinstance(line[1], str)
+            ):
+                # Structural
+                (linenum, content) = line
+                if content.strip().upper() == ":PROPERTIES:":
+                    assert current_node is None
+                    current_node = dom.PropertyDrawerNode()
+                    tree.append(current_node)
+                elif content.strip().upper() == ":LOGBOOK:":
+                    assert current_node is None
+                    current_node = dom.LogbookDrawerNode()
+                    tree.append(current_node)
+                elif content.strip().upper() == ":END:":
+                    assert isinstance(
+                        current_node, dom.PropertyDrawerNode
+                    ) or isinstance(current_node, dom.LogbookDrawerNode)
+                    current_node = None
+                else:
+                    raise Exception("Unknown structural line: {}".format(line))
+            else:
+                raise Exception("Unknown node type: {}".format(line))
+
+        return tree
 
     def getLists(self):
         lists = []
@@ -1281,6 +1379,61 @@ def parse_headline(hl, doc, parent) -> Headline:
     return headline
 
 
+def dump_kw(kw):
+    options = kw.match.group("options")
+    if not options:
+        options = ""
+
+    return (
+        kw.linenum,
+        "{indentation}#+{key}{options}:{spacing}{value}".format(
+            indentation=kw.match.group("indentation"),
+            key=kw.key,
+            options=kw.options,
+            spacing=kw.match.group("spacing"),
+            value=kw.value,
+        ),
+    )
+
+
+def dump_property(prop: Property):
+    plus = ""
+    indentation = ""
+    spacing = " "
+    if prop.match is not None:
+        plus = prop.match.group("plus")
+        if plus is None:
+            plus = ""
+        indentation = prop.match.group("indentation")
+        spacing = prop.match.group("spacing")
+
+    if isinstance(prop.value, TimeRange):
+        value = timerange_to_string(prop.value)
+    elif isinstance(prop.value, OrgTime):
+        value = prop.value.to_raw()
+    else:
+        value = prop.value
+
+    return (
+        prop.linenum,
+        "{indentation}:{key}{plus}:{spacing}{value}".format(
+            indentation=indentation,
+            key=prop.key,
+            plus=plus,
+            spacing=spacing,
+            value=value,
+        ),
+    )
+
+
+def dump_structural(structural: Tuple):
+    return (structural[0], structural[1])
+
+
+def dump_delimiters(line: DelimiterLine):
+    return (line.linenum, line.line)
+
+
 class OrgDoc:
     def __init__(
         self, headlines, keywords, contents, list_items, structural, properties
@@ -1350,57 +1503,6 @@ class OrgDoc:
             yield from headline.get_code_snippets()
 
     # Writing
-    def dump_kw(self, kw):
-        options = kw.match.group("options")
-        if not options:
-            options = ""
-
-        return (
-            kw.linenum,
-            "{indentation}#+{key}{options}:{spacing}{value}".format(
-                indentation=kw.match.group("indentation"),
-                key=kw.key,
-                options=kw.options,
-                spacing=kw.match.group("spacing"),
-                value=kw.value,
-            ),
-        )
-
-    def dump_property(self, prop: Property):
-        plus = ""
-        indentation = ""
-        spacing = " "
-        if prop.match is not None:
-            plus = prop.match.group("plus")
-            if plus is None:
-                plus = ""
-            indentation = prop.match.group("indentation")
-            spacing = prop.match.group("spacing")
-
-        if isinstance(prop.value, TimeRange):
-            value = timerange_to_string(prop.value)
-        elif isinstance(prop.value, OrgTime):
-            value = prop.value.to_raw()
-        else:
-            value = prop.value
-
-        return (
-            prop.linenum,
-            "{indentation}:{key}{plus}:{spacing}{value}".format(
-                indentation=indentation,
-                key=prop.key,
-                plus=plus,
-                spacing=spacing,
-                value=value,
-            ),
-        )
-
-    def dump_structural(self, structural: Tuple):
-        return (structural[0], structural[1])
-
-    def dump_delimiters(self, line: DelimiterLine):
-        return (line.linenum, line.line)
-
     def dump_headline(self, headline):
 
         tags = ""
@@ -1423,7 +1525,7 @@ class OrgDoc:
         PROPERTIES_T = 2
         STRUCTURAL_T = 3
         for keyword in headline.keywords:
-            lines.append((KW_T, self.dump_kw(keyword)))
+            lines.append((KW_T, dump_kw(keyword)))
 
         for content in headline.contents:
             lines.append((CONTENT_T, dump_contents(content)))
@@ -1432,13 +1534,13 @@ class OrgDoc:
             lines.append((CONTENT_T, dump_contents(li)))
 
         for prop in headline.properties:
-            lines.append((PROPERTIES_T, self.dump_property(prop)))
+            lines.append((PROPERTIES_T, dump_property(prop)))
 
         for struct in headline.structural:
-            lines.append((STRUCTURAL_T, self.dump_structural(struct)))
+            lines.append((STRUCTURAL_T, dump_structural(struct)))
 
         for content in headline.delimiters:
-            lines.append((STRUCTURAL_T, self.dump_delimiters(content)))
+            lines.append((STRUCTURAL_T, dump_delimiters(content)))
 
         lines = sorted(lines, key=lambda x: x[1][0])
 
@@ -1500,13 +1602,13 @@ class OrgDoc:
     def dump(self):
         lines = []
         for prop in self.properties:
-            lines.append(self.dump_property(prop))
+            lines.append(dump_property(prop))
 
         for struct in self.structural:
-            lines.append(self.dump_structural(struct))
+            lines.append(dump_structural(struct))
 
         for kw in self.keywords:
-            lines.append(self.dump_kw(kw))
+            lines.append(dump_kw(kw))
 
         for line in self.contents:
             lines.append(dump_contents(line))
