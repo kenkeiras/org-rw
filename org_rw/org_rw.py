@@ -449,7 +449,20 @@ class Headline:
                 last_line = last_prop.linenum
                 last_match = last_prop.match
             else:
-                last_line = 0
+                self.structural.append(
+                    (
+                        -2,  # Linenum
+                        ":PROPERTIES:",
+                    )
+                )
+                self.structural.append(
+                    (
+                        0,  # Linenum
+                        ":END:",
+                    )
+                )
+
+                last_line = -1
                 last_match = None
             self.properties.append(
                 Property(
@@ -1550,26 +1563,6 @@ class OrgDoc:
             ltype = line[0]
             content = line[1][1]
 
-            if ltype == PROPERTIES_T and last_type not in (STRUCTURAL_T, PROPERTIES_T):
-                # No structural opening
-                structured_lines.append(" " * content.index(":") + ":PROPERTIES:\n")
-                logging.warning(
-                    "Added structural: ".format(
-                        line[1][0], structured_lines[-1].strip()
-                    )
-                )
-            elif (
-                ltype not in (STRUCTURAL_T, PROPERTIES_T) and last_type == PROPERTIES_T
-            ):
-                # No structural closing
-                last_line = lines[i - 1][1][1]
-                structured_lines.append(" " * last_line.index(":") + ":END:\n")
-                logging.warning(
-                    "Added structural:{}: {}".format(
-                        line[1][0], structured_lines[-1].strip()
-                    )
-                )
-
             content = content + "\n"
             last_type = ltype
             structured_lines.append(content)
@@ -1792,12 +1785,15 @@ class OrgDocReader:
                 # Generic properties
                 elif m := KEYWORDS_RE.match(line):
                     self.add_keyword_line(linenum, m)
-                elif m := DRAWER_START_RE.match(line):
-                    self.add_property_drawer_line(linenum, line, m)
                 elif m := DRAWER_END_RE.match(line):
                     self.add_drawer_end_line(linenum, line, m)
-                elif m := RESULTS_DRAWER_RE.match(line):
+                    in_drawer = False
+                elif (not in_drawer) and (m := DRAWER_START_RE.match(line)):
+                    self.add_property_drawer_line(linenum, line, m)
+                    in_drawer = True
+                elif (not in_drawer) and (m := RESULTS_DRAWER_RE.match(line)):
                     self.add_results_drawer_line(linenum, line, m)
+                    in_drawer = True
                 elif m := NODE_PROPERTIES_RE.match(line):
                     self.add_node_properties_line(linenum, m)
                 # Not captured
