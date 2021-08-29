@@ -97,6 +97,7 @@ CodeSnippet = collections.namedtuple("CodeSnippet", ("name", "content", "result"
 
 # Groupings
 NON_FINISHED_GROUPS = (type(None), dom.ListGroupNode)
+FREE_GROUPS = (dom.CodeBlock,)
 
 
 def get_tokens(value):
@@ -283,9 +284,21 @@ class Headline:
         current_node = None
 
         for line in sorted(everything, key=get_line):
-            # print("#-", current_node)
-            # print("=>", line)
-            if isinstance(line, Property):
+            print("#-", current_node)
+            print("=>", line)
+            if isinstance(current_node, dom.CodeBlock):
+                if (
+                    isinstance(line, DelimiterLine)
+                    and line.delimiter_type == DelimiterLineType.END_SRC
+                ):
+                    current_node = None
+                else:
+                    current_node.append(line)
+
+            elif isinstance(line, Property):
+                if type(current_node) in NON_FINISHED_GROUPS:
+                    current_node = dom.PropertyDrawerNode()
+                    tree.append(current_node)
                 assert isinstance(current_node, dom.PropertyDrawerNode)
                 current_node.append(dom.PropertyNode(line.key, line.value))
 
@@ -295,7 +308,9 @@ class Headline:
                 elif isinstance(current_node, dom.LogbookDrawerNode):
                     current_node.append(dom.Text(line))
                 else:
-                    assert type(current_node) in NON_FINISHED_GROUPS
+                    if type(current_node) not in NON_FINISHED_GROUPS:
+                        print("Parent: {}\nValue: {}".format(current_node, line))
+                        assert type(current_node) in NON_FINISHED_GROUPS
                     current_node = None
                     tree.append(dom.Text(line))
 
@@ -303,7 +318,9 @@ class Headline:
                 if current_node is None:
                     current_node = dom.ListGroupNode()
                     tree.append(current_node)
-                assert isinstance(current_node, dom.ListGroupNode)
+                if not isinstance(current_node, dom.ListGroupNode):
+                    print("Parent: {}\nValue: {}".format(current_node, line))
+                    assert isinstance(current_node, dom.ListGroupNode)
                 current_node.append(dom.ListItem(line))
 
             elif (
@@ -314,12 +331,15 @@ class Headline:
                 current_node = dom.CodeBlock(line)
                 current_node.append(current_node)
 
-            elif (
-                isinstance(line, DelimiterLine)
-                and line.delimiter_type == DelimiterLineType.END_SRC
-            ):
-                assert isinstance(current_node, dom.BlockNode)
-                current_node = None
+            elif isinstance(line, Keyword):
+                logging.warning("Keywords not implemented on `as_dom()`")
+
+            # elif (
+            #     isinstance(line, DelimiterLine)
+            #     and line.delimiter_type == DelimiterLineType.END_SRC
+            # ):
+            #     assert isinstance(current_node, dom.BlockNode)
+            #     current_node = None
 
             elif (
                 isinstance(line, tuple)
@@ -1705,28 +1725,28 @@ class OrgDocReader:
         else:
             self.headline_hierarchy[-1]["keywords"].append(kw)
 
-    def add_raw_line(self, linenum: int, line: str) -> int:
+    def add_raw_line(self, linenum: int, line: str):
         raw = RawLine(linenum, line)
         if len(self.headline_hierarchy) == 0:
             self.contents.append(raw)
         else:
             self.headline_hierarchy[-1]["contents"].append(raw)
 
-    def add_begin_src_line(self, linenum: int, match: re.Match) -> int:
+    def add_begin_src_line(self, linenum: int, match: re.Match):
         line = DelimiterLine(linenum, match.group(0), DelimiterLineType.BEGIN_SRC)
         if len(self.headline_hierarchy) == 0:
             self.delimiters.append(line)
         else:
             self.headline_hierarchy[-1]["delimiters"].append(line)
 
-    def add_end_src_line(self, linenum: int, match: re.Match) -> int:
+    def add_end_src_line(self, linenum: int, match: re.Match):
         line = DelimiterLine(linenum, match.group(0), DelimiterLineType.END_SRC)
         if len(self.headline_hierarchy) == 0:
             self.delimiters.append(line)
         else:
             self.headline_hierarchy[-1]["delimiters"].append(line)
 
-    def add_property_drawer_line(self, linenum: int, line: str, match: re.Match) -> int:
+    def add_property_drawer_line(self, linenum: int, line: str, match: re.Match):
         if len(self.headline_hierarchy) == 0:
             self.current_drawer = self.properties
             self.structural.append((linenum, line))
@@ -1734,17 +1754,20 @@ class OrgDocReader:
             self.current_drawer = self.headline_hierarchy[-1]["properties"]
             self.headline_hierarchy[-1]["structural"].append((linenum, line))
 
-    def add_results_drawer_line(self, linenum: int, line: str, match: re.Match) -> int:
+    def add_results_drawer_line(self, linenum: int, line: str, match: re.Match):
         self.current_drawer = self.headline_hierarchy[-1]["results"]
         self.headline_hierarchy[-1]["structural"].append((linenum, line))
 
-    def add_logbook_drawer_line(self, linenum: int, line: str, match: re.Match) -> int:
+    def add_logbook_drawer_line(self, linenum: int, line: str, match: re.Match):
         self.current_drawer = self.headline_hierarchy[-1]["logbook"]
         self.headline_hierarchy[-1]["structural"].append((linenum, line))
 
-    def add_drawer_end_line(self, linenum: int, line: str, match: re.Match) -> int:
+    def add_drawer_end_line(self, linenum: int, line: str, match: re.Match):
         self.current_drawer = None
-        self.headline_hierarchy[-1]["structural"].append((linenum, line))
+        if len(self.headline_hierarchy) == 0:
+            self.structural.append((linenum, line))
+        else:
+            self.headline_hierarchy[-1]["structural"].append((linenum, line))
 
     def add_node_properties_line(self, linenum: int, match: re.Match) -> int:
         key = match.group("key")
@@ -1755,7 +1778,7 @@ class OrgDocReader:
 
         try:
             self.current_drawer.append(Property(linenum, match, key, value, None))
-        except:
+        except Exception:
             if "current_drawer" not in dir(self):  # Throw a better error on this case
                 raise Exception(
                     "Found properties before :PROPERTIES: line. Error on Org file?"
@@ -1767,6 +1790,7 @@ class OrgDocReader:
         lines = s.split("\n")
         line_count = len(lines)
         reader = enumerate(lines)
+        in_drawer = False
 
         for lnum, line in reader:
             linenum = lnum + 1
