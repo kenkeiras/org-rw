@@ -282,6 +282,7 @@ class Headline:
 
         tree = []
         current_node = None
+        indentation_tree = []
 
         for line in sorted(everything, key=get_line):
             print("#-", current_node)
@@ -318,10 +319,48 @@ class Headline:
                 if current_node is None:
                     current_node = dom.ListGroupNode()
                     tree.append(current_node)
+                    indentation_tree = [current_node]
                 if not isinstance(current_node, dom.ListGroupNode):
                     print("Parent: {}\nValue: {}".format(current_node, line))
                     assert isinstance(current_node, dom.ListGroupNode)
-                current_node.append(dom.ListItem(line))
+
+                if len(indentation_tree) > 0 and (
+                    (len(indentation_tree[-1].children) > 0)
+                    and len(
+                        [
+                            c
+                            for c in indentation_tree[-1].children
+                            if isinstance(c, dom.ListItem)
+                        ][-1].content.indentation
+                    )
+                    < len(line.indentation)
+                ):
+                    sublist = dom.ListGroupNode()
+                    current_node.append(sublist)
+                    current_node = sublist
+                    indentation_tree.append(current_node)
+
+                while len(indentation_tree) > 0 and (
+                    (len(indentation_tree[-1].children) > 0)
+                    and len(
+                        [
+                            c
+                            for c in indentation_tree[-1].children
+                            if isinstance(c, dom.ListItem)
+                        ][-1].content.indentation
+                    )
+                    > len(line.indentation)
+                ):
+                    rem = indentation_tree.pop()
+                    if len(indentation_tree) == 0:
+                        indentation_tree.append(rem)
+                        current_node = rem
+                        break
+                    else:
+                        current_node = indentation_tree[-1]
+
+                node = dom.ListItem(line)
+                current_node.append(node)
 
             elif (
                 isinstance(line, DelimiterLine)
