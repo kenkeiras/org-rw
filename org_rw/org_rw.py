@@ -12,6 +12,8 @@ from typing import Generator, List, Tuple, Union
 
 from . import dom
 
+DEBUG_DIFF_CONTEXT = 10
+
 BASE_ENVIRONMENT = {
     "org-footnote-section": "Footnotes",
     "org-options-keywords": (
@@ -1880,7 +1882,24 @@ def loads(s, environment=BASE_ENVIRONMENT, extra_cautious=True):
                 )
             )
 
-            sys.stderr.writelines(diff)
+            context_start = None
+            context_last_line = None
+            for i, line in enumerate(diff):
+                if not line.startswith(" "):
+                    if context_start is None:
+                        context_start = i
+                    context_last_line = i
+                elif context_start:
+                    if i > (context_last_line + DEBUG_DIFF_CONTEXT):
+                        start = max(0, context_start - DEBUG_DIFF_CONTEXT)
+                        end = min(len(diff), context_last_line + DEBUG_DIFF_CONTEXT)
+                        print(
+                            "## Lines {} to {}".format(start + 1, end + 1),
+                            file=sys.stderr,
+                        )
+                        sys.stderr.writelines(diff[start:end])
+                        context_start = None
+                        context_last_line = None
             # print("---\n" + after_dump + "\n---")
 
             raise Exception("Difference found between existing version and dumped")
