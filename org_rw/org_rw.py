@@ -1514,7 +1514,7 @@ class OrgDoc:
         self.done_keywords = DEFAULT_DONE_KEYWORDS
 
         for keyword in keywords:
-            if keyword.key == "TODO":
+            if keyword.key in ("TODO", "SEQ_TODO"):
                 todo_kws, done_kws = re.sub(r"\(.\)", "", keyword.value).split("|", 1)
 
                 self.todo_keywords = re.sub(r"\s{2,}", " ", todo_kws.strip()).split()
