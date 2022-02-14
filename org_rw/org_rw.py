@@ -550,11 +550,10 @@ class Headline:
 
     def get_contents(self, format):
         if format == "raw":
-            lines = []
-            for line in self.contents:
-                lines.append(dump_contents(line))
-
-            yield from map(lambda x: x[1], sorted(lines, key=lambda x: x[0]))
+            yield from map(
+                lambda x: token_list_to_raw(x.contents),
+                sorted(self.contents, key=lambda x: x.linenum),
+            )
         else:
             raise NotImplementedError()
 
