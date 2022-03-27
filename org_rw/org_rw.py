@@ -272,6 +272,14 @@ class Headline:
             # Remove from contents
             self._remove_element_in_line(start_line + 1)
 
+    @property
+    def doc(self):
+        par = self.parent
+        while isinstance(par, Headline):
+            par = par.parent
+        return par
+
+
     def as_dom(self):
         everything = (
             self.keywords
