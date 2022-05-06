@@ -323,7 +323,40 @@ class Headline:
                         print("Parent: {}\nValue: {}".format(current_node, line))
                         assert type(current_node) in NON_FINISHED_GROUPS
                     current_node = None
-                    tree.append(dom.Text(line))
+                    contents = []
+
+                    in_link = False
+                    in_description = False
+                    link_value = []
+                    link_description = []
+
+                    for tok in line.contents:
+                        if isinstance(tok, LinkToken):
+                            if tok.tok_type == LinkTokenType.OPEN_LINK:
+                                in_link = True
+                                open_link_token = tok
+                            elif tok.tok_type == LinkTokenType.OPEN_DESCRIPTION:
+                                in_description = True
+                            elif tok.tok_type == LinkTokenType.CLOSE:
+                                rng = RangeInRaw(content, open_link_token, tok)
+                                contents.append(Link(
+                                    "".join(link_value),
+                                    "".join(link_description) if in_description else None,
+                                    rng,
+                                ))
+                        elif isinstance(tok, str) and in_link:
+                            if in_description:
+                                link_description.append(tok)
+                            else:
+                                link_value.append(tok)
+                        else:
+                            contents.append(tok)
+                    tree.append(dom.Text(contents))
+                    in_link = False
+                    in_description = False
+                    link_value = []
+                    link_description = []
+
 
             elif isinstance(line, ListItem):
                 if current_node is None:
