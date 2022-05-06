@@ -176,6 +176,37 @@ def get_links_from_content(content):
             else:
                 link_value.append(tok)
 
+def text_to_dom(tokens, item):
+    in_link = False
+    in_description = False
+    link_value = []
+    link_description = []
+    
+    contents = []
+    
+    for tok in tokens:
+        if isinstance(tok, LinkToken):
+            if tok.tok_type == LinkTokenType.OPEN_LINK:
+                in_link = True
+                open_link_token = tok
+            elif tok.tok_type == LinkTokenType.OPEN_DESCRIPTION:
+                in_description = True
+            elif tok.tok_type == LinkTokenType.CLOSE:
+                rng = RangeInRaw(item, open_link_token, tok)
+                contents.append(Link(
+                    "".join(link_value),
+                    "".join(link_description) if in_description else None,
+                    rng,
+                ))
+        elif isinstance(tok, str) and in_link:
+            if in_description:
+                link_description.append(tok)
+            else:
+                link_value.append(tok)
+        else:
+            contents.append(tok)
+
+    return contents
 
 def get_line(item):
     if isinstance(item, Text):
@@ -324,39 +355,7 @@ class Headline:
                         assert type(current_node) in NON_FINISHED_GROUPS
                     current_node = None
                     contents = []
-
-                    in_link = False
-                    in_description = False
-                    link_value = []
-                    link_description = []
-
-                    for tok in line.contents:
-                        if isinstance(tok, LinkToken):
-                            if tok.tok_type == LinkTokenType.OPEN_LINK:
-                                in_link = True
-                                open_link_token = tok
-                            elif tok.tok_type == LinkTokenType.OPEN_DESCRIPTION:
-                                in_description = True
-                            elif tok.tok_type == LinkTokenType.CLOSE:
-                                rng = RangeInRaw(content, open_link_token, tok)
-                                contents.append(Link(
-                                    "".join(link_value),
-                                    "".join(link_description) if in_description else None,
-                                    rng,
-                                ))
-                        elif isinstance(tok, str) and in_link:
-                            if in_description:
-                                link_description.append(tok)
-                            else:
-                                link_value.append(tok)
-                        else:
-                            contents.append(tok)
-                    tree.append(dom.Text(contents))
-                    in_link = False
-                    in_description = False
-                    link_value = []
-                    link_description = []
-
+                    tree.append(dom.Text(text_to_dom(line.contents, line)))
 
             elif isinstance(line, ListItem):
                 if current_node is None:
@@ -374,7 +373,7 @@ class Headline:
                             c
                             for c in indentation_tree[-1].children
                             if isinstance(c, dom.ListItem)
-                        ][-1].content.indentation
+                        ][-1].orig.indentation
                     )
                     < len(line.indentation)
                 ):
@@ -390,7 +389,7 @@ class Headline:
                             c
                             for c in indentation_tree[-1].children
                             if isinstance(c, dom.ListItem)
-                        ][-1].content.indentation
+                        ][-1].orig.indentation
                     )
                     > len(line.indentation)
                 ):
@@ -402,7 +401,7 @@ class Headline:
                     else:
                         current_node = indentation_tree[-1]
 
-                node = dom.ListItem(line)
+                node = dom.ListItem(line.tag, text_to_dom(line.content, line), orig=line)
                 current_node.append(node)
 
             elif (

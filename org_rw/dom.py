@@ -46,8 +46,10 @@ class Text:
 
 
 class ListItem:
-    def __init__(self, content):
+    def __init__(self, tag, content, orig=None):
+        self.tag = tag
         self.content = content
+        self.orig = orig
 
 
 class BlockNode:
