@@ -326,13 +326,12 @@ class Headline:
         indentation_tree = []
 
         for line in sorted(everything, key=get_line):
-            print("#-", current_node)
-            print("=>", line)
             if isinstance(current_node, dom.CodeBlock):
                 if (
                     isinstance(line, DelimiterLine)
                     and line.delimiter_type == DelimiterLineType.END_SRC
                 ):
+                    tree.append(current_node)
                     current_node = None
                 else:
                     current_node.append(line)
@@ -351,7 +350,6 @@ class Headline:
                     current_node.append(dom.Text(line))
                 else:
                     if type(current_node) not in NON_FINISHED_GROUPS:
-                        print("Parent: {}\nValue: {}".format(current_node, line))
                         assert type(current_node) in NON_FINISHED_GROUPS
                     current_node = None
                     contents = []
@@ -363,7 +361,6 @@ class Headline:
                     tree.append(current_node)
                     indentation_tree = [current_node]
                 if not isinstance(current_node, dom.ListGroupNode):
-                    print("Parent: {}\nValue: {}".format(current_node, line))
                     assert isinstance(current_node, dom.ListGroupNode)
 
                 if len(indentation_tree) > 0 and (
@@ -1881,11 +1878,19 @@ class OrgDocReader:
         line_count = len(lines)
         reader = enumerate(lines)
         in_drawer = False
+        in_block = False
 
         for lnum, line in reader:
             linenum = lnum + 1
             try:
-                if m := HEADLINE_RE.match(line):
+                if in_block:
+                    if m := END_SRC_RE.match(line):
+                        self.add_end_src_line(linenum, m)
+                        in_block = False
+                    else:
+                        self.add_raw_line(linenum, line)
+
+                elif m := HEADLINE_RE.match(line):
                     self.add_headline(linenum, m)
                 elif m := LIST_ITEM_RE.match(line):
                     self.add_list_item_line(linenum, m)
@@ -1894,8 +1899,10 @@ class OrgDocReader:
                 # Org-babel
                 elif m := BEGIN_SRC_RE.match(line):
                     self.add_begin_src_line(linenum, m)
+                    in_block = True
                 elif m := END_SRC_RE.match(line):
                     self.add_end_src_line(linenum, m)
+                    in_block = False
                 # Generic properties
                 elif m := KEYWORDS_RE.match(line):
                     self.add_keyword_line(linenum, m)
