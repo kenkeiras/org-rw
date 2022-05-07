@@ -60,10 +60,10 @@ class BlockNode:
 class CodeBlock(BlockNode):
     def __init__(self, header):
         self.header = header
-        self.lines = []
+        self.lines = None
 
-    def append(self, child):
-        self.lines.append(child)
+    def set_lines(self, lines):
+        self.lines = lines
 
     def __repr__(self):
         return "<Code: {}>".format(len(self.lines))

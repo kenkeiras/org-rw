@@ -331,10 +331,22 @@ class Headline:
                     isinstance(line, DelimiterLine)
                     and line.delimiter_type == DelimiterLineType.END_SRC
                 ):
+
+                    start = current_node.header.linenum
+                    end = line.linenum
+
+                    lines = self.get_lines_between(start + 1, end)
+                    contents = "\n".join(lines)
+                    if contents.endswith("\n"):
+                        # This is not ideal, but to avoid having to do this maybe
+                        # the content parsing must be re-thinked
+                        contents = contents[:-1]
+
+                    current_node.set_lines(contents)
                     tree.append(current_node)
                     current_node = None
                 else:
-                    current_node.append(line)
+                    pass # Ignore
 
             elif isinstance(line, Property):
                 if type(current_node) in NON_FINISHED_GROUPS:
@@ -407,7 +419,6 @@ class Headline:
             ):
                 assert type(current_node) in NON_FINISHED_GROUPS
                 current_node = dom.CodeBlock(line)
-                current_node.append(current_node)
 
             elif isinstance(line, Keyword):
                 logging.warning("Keywords not implemented on `as_dom()`")
@@ -583,7 +594,13 @@ class Headline:
     def get_lines_between(self, start, end):
         for line in self.contents:
             if start <= line.linenum < end:
-                yield "".join(line.contents)
+                text = []
+                for item in line.contents:
+                    if isinstance(item, str):
+                        text.append(item)
+                    elif isinstance(item, MarkerType):
+                        text.append(ModeToMarker[item])
+                yield "".join(text)
 
     def get_contents(self, format):
         if format == "raw":
