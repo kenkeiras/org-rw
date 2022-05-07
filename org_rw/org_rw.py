@@ -1572,6 +1572,16 @@ class OrgDoc:
         )
 
     @property
+    def id(self):
+        """
+        Created by org-roam v2.
+        """
+        for p in self.properties:
+            if p.key == 'ID':
+                return p.value
+        return None
+
+    @property
     def path(self):
         return self._path
 
