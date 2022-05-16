@@ -17,7 +17,18 @@ class LogbookDrawerNode:
         self.children.append(child)
 
     def __repr__(self):
-        return "<Properties: {}>".format(len(self.children))
+        return "<LogBook: {}>".format(len(self.children))
+
+
+class ResultsDrawerNode:
+    def __init__(self):
+        self.children = []
+
+    def append(self, child):
+        self.children.append(child)
+
+    def __repr__(self):
+        return "<Results: {}>".format(len(self.children))
 
 
 class PropertyNode:

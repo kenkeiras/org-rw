@@ -98,7 +98,7 @@ RESULTS_DRAWER_RE = re.compile(r"^\s*:results:\s*$", re.I)
 CodeSnippet = collections.namedtuple("CodeSnippet", ("name", "content", "result"))
 
 # Groupings
-NON_FINISHED_GROUPS = (type(None), dom.ListGroupNode)
+NON_FINISHED_GROUPS = (type(None), dom.ListGroupNode, dom.ResultsDrawerNode, dom.PropertyDrawerNode)
 FREE_GROUPS = (dom.CodeBlock,)
 
 
@@ -181,9 +181,9 @@ def text_to_dom(tokens, item):
     in_description = False
     link_value = []
     link_description = []
-    
+
     contents = []
-    
+
     for tok in tokens:
         if isinstance(tok, LinkToken):
             if tok.tok_type == LinkTokenType.OPEN_LINK:
@@ -362,7 +362,7 @@ class Headline:
                     current_node.append(dom.Text(line))
                 else:
                     if type(current_node) not in NON_FINISHED_GROUPS:
-                        assert type(current_node) in NON_FINISHED_GROUPS
+                        raise NotImplementedError('Not implemented node type: {}'.format(current_node))
                     current_node = None
                     contents = []
                     tree.append(dom.Text(text_to_dom(line.contents, line)))
@@ -373,7 +373,9 @@ class Headline:
                     tree.append(current_node)
                     indentation_tree = [current_node]
                 if not isinstance(current_node, dom.ListGroupNode):
-                    assert isinstance(current_node, dom.ListGroupNode)
+                    if not isinstance(current_node, dom.ListGroupNode):
+                        logging.warning("Expected a {}, found: {} on line {}".format(dom.ListGroupNode, current_node, line.linenum))
+                        # This can happen. Frequently inside a LogDrawer
 
                 if len(indentation_tree) > 0 and (
                     (len(indentation_tree[-1].children) > 0)
@@ -447,10 +449,21 @@ class Headline:
                     current_node = dom.LogbookDrawerNode()
                     tree.append(current_node)
                 elif content.strip().upper() == ":END:":
-                    assert isinstance(
+                    if current_node is None:
+                        logging.warning('Finished node (:END:) with no known starter')
+                    elif not (isinstance(
                         current_node, dom.PropertyDrawerNode
-                    ) or isinstance(current_node, dom.LogbookDrawerNode)
+                    ) or isinstance(
+                        current_node, dom.LogbookDrawerNode
+                    ) or isinstance(
+                        current_node, dom.ResultsDrawerNode
+                    )):
+                        raise Exception('Unexpected node: {}'.format(current_node))
                     current_node = None
+                elif content.strip().upper() == ":RESULTS:":
+                    assert current_node is None
+                    current_node = dom.ResultsDrawerNode()
+                    tree.append(current_node)
                 else:
                     raise Exception("Unknown structural line: {}".format(line))
             else:
