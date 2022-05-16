@@ -1476,6 +1476,9 @@ def parse_headline(hl, doc, parent) -> Headline:
 
     contents = parse_contents(hl["contents"])
 
+    if not (isinstance(parent, OrgDoc) or depth > parent.depth):
+        raise AssertionError("Incorrectly parsed parent on `{}' > `{}'".format(parent.title, title))
+
     headline = Headline(
         start_line=hl["linenum"],
         depth=depth,
@@ -1781,17 +1784,25 @@ class OrgDocReader:
             "list_items": [],
         }
 
-        while (depth - 2) > len(self.headline_hierarchy):
+        while (depth - 1) > len(self.headline_hierarchy):
             # Introduce structural headlines
             self.headline_hierarchy.append(None)
-        while depth < len(self.headline_hierarchy):
+        while depth <= len(self.headline_hierarchy):
             self.headline_hierarchy.pop()
 
         if depth == 1:
             self.headlines.append(headline)
         else:
-            self.headline_hierarchy[-1]["children"].append(headline)
+            parent_idx = len(self.headline_hierarchy) - 1
+            while self.headline_hierarchy[parent_idx] is None:
+                parent_idx -= 1
+            self.headline_hierarchy[parent_idx]["children"].append(headline)
         self.headline_hierarchy.append(headline)
+
+        if all([hl is not None for hl in self.headline_hierarchy]):
+            if not ([ len(hl['orig'].group('stars')) for hl in self.headline_hierarchy ]
+                    == list(range(1, len(self.headline_hierarchy) + 1))):
+                raise AssertionError('Error on Headline Hierarchy')
 
     def add_list_item_line(self, linenum: int, match: re.Match) -> int:
         li = ListItem(
