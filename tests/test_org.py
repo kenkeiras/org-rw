@@ -418,6 +418,20 @@ class TestSerde(unittest.TestCase):
             Timestamp(True, 2020, 12, 15, "Mar", 0, 10),
         )
 
+        hl_schedule_range = hl.children[1]
+        self.assertEqual(
+            hl_schedule_range.scheduled.time,
+            Timestamp(True, 2020, 12, 15, "Mar", 0, 5, '++1w')
+        )
+        self.assertEqual(
+            hl_schedule_range.scheduled.end_time,
+            Timestamp(True, 2020, 12, 15, "Mar", 0, 10),
+        )
+        self.assertEqual(
+            hl_schedule_range.scheduled.repetition,
+            '++1w',
+        )
+
     def test_update_info_file_05(self):
         with open(os.path.join(DIR, "05-dates.org")) as f:
             orig = f.read()

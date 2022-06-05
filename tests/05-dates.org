@@ -19,3 +19,6 @@ SCHEDULED: <2020-12-12 Sáb> CLOSED: <2020-12-13 Dom> DEADLINE: <2020-12-14 Lun>
 
 ** Scheduled for time range
 SCHEDULED: <2020-12-15 Mar 00:05-00:10>
+
+** Scheduled periodic
+SCHEDULED: <2020-12-15 Mar 00:05-00:10 ++1w>

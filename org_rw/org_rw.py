@@ -961,6 +961,10 @@ class OrgTime:
         self.end_time = end_time
 
     @property
+    def repetition(self):
+        return self.time.repetition
+
+    @property
     def duration(self):
         if self.end_time is None:
             return timedelta()  # No duration
@@ -982,6 +986,10 @@ class OrgTime:
         else:
             return None
 
+        repetition = None
+        if m.group("repetition"):
+            repetition = m.group("repetition").strip()
+
         if m.group("end_hour"):
             return OrgTime(
                 Timestamp(
@@ -992,6 +1000,7 @@ class OrgTime:
                     m.group("dow"),
                     int(m.group("start_hour")),
                     int(m.group("start_minute")),
+                    repetition=repetition,
                 ),
                 Timestamp(
                     active,
@@ -1013,7 +1022,7 @@ class OrgTime:
                 m.group("dow"),
                 int(m.group("start_hour")) if m.group("start_hour") else None,
                 int(m.group("start_minute")) if m.group("start_minute") else None,
-                m.group("repetition").strip() if m.group("repetition") else None,
+                repetition=repetition,
             )
         )
 
@@ -1047,7 +1056,7 @@ def timestamp_to_string(ts: Timestamp, end_time: Union[Timestamp, None] = None) 
             base=base, hour=end_time.hour, minute=end_time.minute
         )
 
-    if ts.repetition:
+    if ts.repetition is not None:
         base = base + " " + ts.repetition
 
     if ts.active:
