@@ -8,7 +8,7 @@ import re
 import sys
 from datetime import date, datetime, timedelta
 from enum import Enum
-from typing import Generator, List, Tuple, Union
+from typing import Generator, List, Optional, Tuple, Union
 
 from . import dom
 
@@ -779,7 +779,7 @@ class Timestamp:
         self.minute = minute
         self.repetition = repetition
 
-    def to_datetime(self) -> Union[datetime, date]:
+    def to_datetime(self) -> datetime:
         if self.hour is not None:
             return datetime(self.year, self.month, self.day, self.hour, self.minute)
         else:
@@ -955,7 +955,7 @@ def parse_org_time_range(start, end) -> TimeRange:
 
 
 class OrgTime:
-    def __init__(self, ts: Timestamp, end_time: Union[Timestamp, None] = None):
+    def __init__(self, ts: Timestamp, end_time: Optional[Timestamp] = None):
         assert ts is not None
         self.time = ts
         self.end_time = end_time
@@ -1035,7 +1035,7 @@ def timerange_to_string(tr: TimeRange):
     return tr.start_time.to_raw() + "--" + tr.end_time.to_raw()
 
 
-def timestamp_to_string(ts: Timestamp, end_time: Union[Timestamp, None] = None) -> str:
+def timestamp_to_string(ts: Timestamp, end_time: Optional[Timestamp] = None) -> str:
     date = "{year}-{month:02d}-{day:02d}".format(
         year=ts.year, month=ts.month, day=ts.day
     )
