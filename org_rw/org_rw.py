@@ -102,6 +102,14 @@ NON_FINISHED_GROUPS = (type(None), dom.ListGroupNode, dom.ResultsDrawerNode, dom
 FREE_GROUPS = (dom.CodeBlock,)
 
 
+class NonReproducibleDocument(Exception):
+    """
+    Exception thrown when a document would be saved as different contents
+    from what it's loaded from.
+    """
+    pass
+
+
 def get_tokens(value):
     if isinstance(value, Text):
         return value.contents
@@ -2008,7 +2016,7 @@ def loads(s, environment=BASE_ENVIRONMENT, extra_cautious=True):
                         context_last_line = None
             # print("---\n" + after_dump + "\n---")
 
-            raise Exception("Difference found between existing version and dumped")
+            raise NonReproducibleDocument("Difference found between existing version and dumped")
     return doc
 
 
