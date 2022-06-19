@@ -1673,7 +1673,7 @@ class OrgDoc:
             yield from headline.get_code_snippets()
 
     # Writing
-    def dump_headline(self, headline):
+    def dump_headline(self, headline, recursive=True):
 
         tags = ""
         if len(headline.shallow_tags) > 0:
@@ -1746,8 +1746,9 @@ class OrgDoc:
             content = content[:-1]
             yield content
 
-        for child in headline.children:
-            yield from self.dump_headline(child)
+        if recursive:
+            for child in headline.children:
+                yield from self.dump_headline(child, recursive=recursive)
 
     def dump(self):
         lines = []
