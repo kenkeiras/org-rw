@@ -206,6 +206,7 @@ def text_to_dom(tokens, item):
                     "".join(link_description) if in_description else None,
                     rng,
                 ))
+                in_link = False
         elif isinstance(tok, str) and in_link:
             if in_description:
                 link_description.append(tok)
