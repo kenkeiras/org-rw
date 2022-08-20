@@ -201,7 +201,7 @@ class TestSerde(unittest.TestCase):
             doc = load(f)
 
         links = list(doc.get_links())
-        self.assertEqual(len(links), 4)
+        self.assertEqual(len(links), 5)
         self.assertEqual(links[0].value, "https://codigoparallevar.com/1")
         self.assertEqual(links[0].description, "web link")
 
@@ -213,6 +213,9 @@ class TestSerde(unittest.TestCase):
 
         self.assertEqual(links[3].value, "id:03-markup-first-level-id")
         self.assertEqual(links[3].description, "a link to a section by id")
+
+        self.assertEqual(links[4].value, "https://codigoparallevar.com/3")
+        self.assertEqual(links[4].description, "web link")
 
         ex = Doc(
             props=[
@@ -261,6 +264,12 @@ class TestSerde(unittest.TestCase):
                             ),
                             ".\n",
                         ),
+                        SPAN("\n"),
+                        SPAN(
+                            "  This is a ",
+                            WEB_LINK("web link", "https://codigoparallevar.com/3"),
+                            " followed up with some text.\n",
+                        ),
                     ],
                 )
             ),
@@ -273,7 +282,7 @@ class TestSerde(unittest.TestCase):
             doc = load(f)
 
         links = list(doc.get_links())
-        self.assertEqual(len(links), 4)
+        self.assertEqual(len(links), 5)
         self.assertEqual(links[0].value, "https://codigoparallevar.com/1")
         self.assertEqual(links[0].description, "web link")
         links[0].value = "https://codigoparallevar.com/1-updated"
@@ -293,6 +302,11 @@ class TestSerde(unittest.TestCase):
         self.assertEqual(links[3].description, "a link to a section by id")
         links[3].value = "id:03-markup-non-existent-level-id"
         links[3].description = None
+
+        self.assertEqual(links[4].value, "https://codigoparallevar.com/3")
+        self.assertEqual(links[4].description, "web link")
+        links[4].value = "https://codigoparallevar.com/3-updated"
+        links[4].description = "web link #3 with update"
 
         ex = Doc(
             props=[
@@ -344,6 +358,15 @@ class TestSerde(unittest.TestCase):
                                 "id:03-markup-non-existent-level-id",
                             ),
                             ".\n",
+                        ),
+                        SPAN("\n"),
+                        SPAN(
+                            "  This is a ",
+                            WEB_LINK(
+                                "web link #3 with update",
+                                "https://codigoparallevar.com/3-updated",
+                            ),
+                            " followed up with some text.\n",
                         ),
                     ],
                 )

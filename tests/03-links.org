@@ -15,3 +15,5 @@
   This is a link with no description to [[* First level]].
 
   This is [[id:03-markup-first-level-id][a link to a section by id]].
+
+  This is a [[https://codigoparallevar.com/3][web link]] followed up with some text.
