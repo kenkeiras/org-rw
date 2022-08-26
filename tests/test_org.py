@@ -201,7 +201,7 @@ class TestSerde(unittest.TestCase):
             doc = load(f)
 
         links = list(doc.get_links())
-        self.assertEqual(len(links), 5)
+        self.assertEqual(len(links), 7)
         self.assertEqual(links[0].value, "https://codigoparallevar.com/1")
         self.assertEqual(links[0].description, "web link")
 
@@ -216,6 +216,12 @@ class TestSerde(unittest.TestCase):
 
         self.assertEqual(links[4].value, "https://codigoparallevar.com/3")
         self.assertEqual(links[4].description, "web link")
+
+        self.assertEqual(links[5].value, "https://codigoparallevar.com/4")
+        self.assertEqual(links[5].description, "[tricky web link]")
+
+        self.assertEqual(links[6].value, "https://codigoparallevar.com/5")
+        self.assertEqual(links[6].description, "another tricky web link")
 
         ex = Doc(
             props=[
@@ -270,6 +276,18 @@ class TestSerde(unittest.TestCase):
                             WEB_LINK("web link", "https://codigoparallevar.com/3"),
                             " followed up with some text.\n",
                         ),
+                        SPAN("\n"),
+                        SPAN(
+                            "  This is a ",
+                            WEB_LINK("[tricky web link]", "https://codigoparallevar.com/4"),
+                            " followed up with some text.\n",
+                        ),
+                        SPAN("\n"),
+                        SPAN(
+                            "  This is [",
+                            WEB_LINK("another tricky web link", "https://codigoparallevar.com/5"),
+                            "] followed up with some text.\n",
+                        ),
                     ],
                 )
             ),
@@ -282,7 +300,7 @@ class TestSerde(unittest.TestCase):
             doc = load(f)
 
         links = list(doc.get_links())
-        self.assertEqual(len(links), 5)
+        self.assertEqual(len(links), 7)
         self.assertEqual(links[0].value, "https://codigoparallevar.com/1")
         self.assertEqual(links[0].description, "web link")
         links[0].value = "https://codigoparallevar.com/1-updated"
@@ -307,6 +325,16 @@ class TestSerde(unittest.TestCase):
         self.assertEqual(links[4].description, "web link")
         links[4].value = "https://codigoparallevar.com/3-updated"
         links[4].description = "web link #3 with update"
+
+        self.assertEqual(links[5].value, "https://codigoparallevar.com/4")
+        self.assertEqual(links[5].description, "[tricky web link]")
+        links[5].value = "https://codigoparallevar.com/4-updated"
+        links[5].description = "[tricky web link #4 with update]"
+
+        self.assertEqual(links[6].value, "https://codigoparallevar.com/5")
+        self.assertEqual(links[6].description, "another tricky web link")
+        links[6].value = "https://codigoparallevar.com/5-updated"
+        links[6].description = "another tricky web link #5 with update"
 
         ex = Doc(
             props=[
@@ -367,6 +395,24 @@ class TestSerde(unittest.TestCase):
                                 "https://codigoparallevar.com/3-updated",
                             ),
                             " followed up with some text.\n",
+                        ),
+                        SPAN("\n"),
+                        SPAN(
+                            "  This is a ",
+                            WEB_LINK(
+                                "[tricky web link #4 with update]",
+                                "https://codigoparallevar.com/4-updated",
+                            ),
+                            " followed up with some text.\n",
+                        ),
+                        SPAN("\n"),
+                        SPAN(
+                            "  This is [",
+                            WEB_LINK(
+                                "another tricky web link #5 with update",
+                                "https://codigoparallevar.com/5-updated",
+                            ),
+                            "] followed up with some text.\n",
                         ),
                     ],
                 )
