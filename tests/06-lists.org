@@ -37,3 +37,17 @@ Also represented as
 
   1) First element
   2) Second element
+
+* Definition lists
+  :PROPERTIES:
+  :ID:       06-definition-lists
+  :CREATED:  [2020-01-01 Wed 01:01]
+  :END:
+
+  - Key :: Value
+  - Key2 :: Value2
+
+Also with markup
+
+- _Key_ :: _Value_
+- /Key/ 2 :: /Value/ 2

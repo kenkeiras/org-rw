@@ -185,6 +185,9 @@ def get_links_from_content(content):
                 link_value.append(tok)
 
 def text_to_dom(tokens, item):
+    if tokens is None:
+        return []
+
     in_link = False
     in_description = False
     link_value = []
@@ -421,7 +424,7 @@ class Headline:
                     else:
                         current_node = indentation_tree[-1]
 
-                node = dom.ListItem(line.tag, text_to_dom(line.content, line), orig=line)
+                node = dom.ListItem(text_to_dom(line.tag, line), text_to_dom(line.content, line), orig=line)
                 current_node.append(node)
 
             elif (
@@ -1464,7 +1467,7 @@ def dump_contents(raw):
         bullet = raw.bullet if raw.bullet else raw.counter + raw.counter_sep
         content = token_list_to_raw(raw.content)
         checkbox = f"[{raw.checkbox_value}]" if raw.checkbox_value else ""
-        tag = f"{raw.tag_indentation}{raw.tag}::" if raw.tag else ""
+        tag = f"{raw.tag_indentation}{token_list_to_raw(raw.tag)}::" if raw.tag else ""
         return (
             raw.linenum,
             f"{raw.indentation}{bullet}{checkbox}{tag}{content}",
@@ -1847,7 +1850,9 @@ class OrgDocReader:
             match.group("checkbox_indentation"),
             match.group("checkbox_value"),
             match.group("tag_indentation"),
-            match.group("tag"),
+            parse_content_block(
+                [RawLine(linenum=linenum, line=match.group("tag"))]
+            ).contents if match.group("tag") else None,
             parse_content_block(
                 [RawLine(linenum=linenum, line=match.group("content"))]
             ).contents,
