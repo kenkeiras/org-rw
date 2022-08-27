@@ -17,3 +17,7 @@
   This is [[id:03-markup-first-level-id][a link to a section by id]].
 
   This is a [[https://codigoparallevar.com/3][web link]] followed up with some text.
+
+  This is a [[https://codigoparallevar.com/4][[tricky web link]​]] followed up with some text.
+
+  This is [[[https://codigoparallevar.com/5][another tricky web link]]] followed up with some text.

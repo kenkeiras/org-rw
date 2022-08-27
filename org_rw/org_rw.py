@@ -1306,10 +1306,12 @@ def tokenize_contents(contents: str):
                 len(contents) > i + 3
                 # At least 3 characters more to open and close a link
                 and contents[i + 1] == "["
+                # TODO: Generalize this to a backtracking, don't just fix the test case...
+                and contents[i + 2] != "["
             ):
-                close = contents.find("]", i)
+                close = contents.find("]]", i)
 
-                if close != -1 and contents[close + 1] == "]":
+                if close != -1:
                     # Link with no description
                     cut_string()
 
@@ -1333,7 +1335,7 @@ def tokenize_contents(contents: str):
                         continue
 
         # Possible link close or open of description
-        if char == "]" and in_link:
+        if char == "]" and len(contents) > i + 1 and in_link:
             if contents[i + 1] == "]":
                 cut_string()
 
@@ -1343,18 +1345,12 @@ def tokenize_contents(contents: str):
                 in_link_description = False
                 continue
 
-            if contents[i + 1] == "[" and not in_link_description:
+            elif contents[i + 1] == "[":
                 cut_string()
 
                 tokens.append((TOKEN_TYPE_OPEN_DESCRIPTION, None))
                 assert "[" == (next(cursor)[1])
                 continue
-
-            raise Exception(
-                "Link cannot contain ']' not followed by '[' or ']'. Starting with {}".format(
-                    contents[last_link_start : i + 10]
-                )
-            )
 
         if in_link and not in_link_description:
             # Link's pointer have no formatting
