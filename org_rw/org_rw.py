@@ -186,7 +186,7 @@ def get_links_from_content(content):
 
 def text_to_dom(tokens, item):
     if tokens is None:
-        return []
+        return None
 
     in_link = False
     in_description = False
