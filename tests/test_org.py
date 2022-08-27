@@ -218,7 +218,7 @@ class TestSerde(unittest.TestCase):
         self.assertEqual(links[4].description, "web link")
 
         self.assertEqual(links[5].value, "https://codigoparallevar.com/4")
-        self.assertEqual(links[5].description, "[tricky web link]")
+        self.assertEqual(links[5].description, "[tricky web link]\u200b")
 
         self.assertEqual(links[6].value, "https://codigoparallevar.com/5")
         self.assertEqual(links[6].description, "another tricky web link")
@@ -279,7 +279,7 @@ class TestSerde(unittest.TestCase):
                         SPAN("\n"),
                         SPAN(
                             "  This is a ",
-                            WEB_LINK("[tricky web link]", "https://codigoparallevar.com/4"),
+                            WEB_LINK("[tricky web link]\u200b", "https://codigoparallevar.com/4"),
                             " followed up with some text.\n",
                         ),
                         SPAN("\n"),
@@ -327,7 +327,7 @@ class TestSerde(unittest.TestCase):
         links[4].description = "web link #3 with update"
 
         self.assertEqual(links[5].value, "https://codigoparallevar.com/4")
-        self.assertEqual(links[5].description, "[tricky web link]")
+        self.assertEqual(links[5].description, "[tricky web link]\u200b")
         links[5].value = "https://codigoparallevar.com/4-updated"
         links[5].description = "[tricky web link #4 with update]"
 
