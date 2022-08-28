@@ -69,9 +69,10 @@ class BlockNode:
 
 
 class CodeBlock(BlockNode):
-    def __init__(self, header):
+    def __init__(self, header, subtype):
         self.header = header
         self.lines = None
+        self.subtype = subtype
 
     def set_lines(self, lines):
         self.lines = lines

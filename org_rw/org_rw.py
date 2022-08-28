@@ -92,8 +92,8 @@ LIST_ITEM_RE = re.compile(
 )
 
 # Org-Babel
-BEGIN_SRC_RE = re.compile(r"^\s*#\+BEGIN_SRC(?P<content>.*)$", re.I)
-END_SRC_RE = re.compile(r"^\s*#\+END_SRC\s*$", re.I)
+BEGIN_BLOCK_RE = re.compile(r"^\s*#\+BEGIN_(?P<subtype>[^ ]+)(?P<content>.*)$", re.I)
+END_BLOCK_RE = re.compile(r"^\s*#\+END_(?P<subtype>[^ ]+)\s*$", re.I)
 RESULTS_DRAWER_RE = re.compile(r"^\s*:results:\s*$", re.I)
 CodeSnippet = collections.namedtuple("CodeSnippet", ("name", "content", "result"))
 
@@ -343,7 +343,7 @@ class Headline:
             if isinstance(current_node, dom.CodeBlock):
                 if (
                     isinstance(line, DelimiterLine)
-                    and line.delimiter_type == DelimiterLineType.END_SRC
+                    and line.delimiter_type == DelimiterLineType.END_BLOCK
                 ):
 
                     start = current_node.header.linenum
@@ -431,17 +431,17 @@ class Headline:
 
             elif (
                 isinstance(line, DelimiterLine)
-                and line.delimiter_type == DelimiterLineType.BEGIN_SRC
+                and line.delimiter_type == DelimiterLineType.BEGIN_BLOCK
             ):
                 assert type(current_node) in NON_FINISHED_GROUPS
-                current_node = dom.CodeBlock(line)
+                current_node = dom.CodeBlock(line, line.type_data.subtype)
 
             elif isinstance(line, Keyword):
                 logging.warning("Keywords not implemented on `as_dom()`")
 
             # elif (
             #     isinstance(line, DelimiterLine)
-            #     and line.delimiter_type == DelimiterLineType.END_SRC
+            #     and line.delimiter_type == DelimiterLineType.END_BLOCK
             # ):
             #     assert isinstance(current_node, dom.BlockNode)
             #     current_node = None
@@ -679,10 +679,10 @@ class Headline:
         sections = []
 
         for delimiter in self.delimiters:
-            if delimiter.delimiter_type == DelimiterLineType.BEGIN_SRC:
+            if delimiter.delimiter_type == DelimiterLineType.BEGIN_BLOCK and delimiter.type_data.subtype.lower() == "src":
                 line_start = delimiter.linenum
                 inside_code = True
-            elif delimiter.delimiter_type == DelimiterLineType.END_SRC:
+            elif delimiter.delimiter_type == DelimiterLineType.END_BLOCK and delimiter.type_data.subtype.lower() == "src":
                 inside_code = False
                 start, end = line_start, delimiter.linenum
 
@@ -873,12 +873,16 @@ class Timestamp:
 
 
 class DelimiterLineType(Enum):
-    BEGIN_SRC = 1
-    END_SRC = 2
+    BEGIN_BLOCK = 1
+    END_BLOCK = 2
 
+
+BlockDelimiterTypeData = collections.namedtuple(
+    "BlockDelimiterTypeData", ("subtype")
+)
 
 DelimiterLine = collections.namedtuple(
-    "DelimiterLine", ("linenum", "line", "delimiter_type")
+    "DelimiterLine", ("linenum", "line", "delimiter_type", "type_data")
 )
 
 
@@ -1891,15 +1895,17 @@ class OrgDocReader:
         else:
             self.headline_hierarchy[-1]["contents"].append(raw)
 
-    def add_begin_src_line(self, linenum: int, match: re.Match):
-        line = DelimiterLine(linenum, match.group(0), DelimiterLineType.BEGIN_SRC)
+    def add_begin_block_line(self, linenum: int, match: re.Match):
+        line = DelimiterLine(linenum, match.group(0), DelimiterLineType.BEGIN_BLOCK,
+                             BlockDelimiterTypeData(match.group("subtype")))
         if len(self.headline_hierarchy) == 0:
             self.delimiters.append(line)
         else:
             self.headline_hierarchy[-1]["delimiters"].append(line)
 
-    def add_end_src_line(self, linenum: int, match: re.Match):
-        line = DelimiterLine(linenum, match.group(0), DelimiterLineType.END_SRC)
+    def add_end_block_line(self, linenum: int, match: re.Match):
+        line = DelimiterLine(linenum, match.group(0), DelimiterLineType.END_BLOCK,
+                             BlockDelimiterTypeData(match.group("subtype")))
         if len(self.headline_hierarchy) == 0:
             self.delimiters.append(line)
         else:
@@ -1956,8 +1962,8 @@ class OrgDocReader:
             linenum = lnum + 1
             try:
                 if in_block:
-                    if m := END_SRC_RE.match(line):
-                        self.add_end_src_line(linenum, m)
+                    if m := END_BLOCK_RE.match(line):
+                        self.add_end_block_line(linenum, m)
                         in_block = False
                     else:
                         self.add_raw_line(linenum, line)
@@ -1969,11 +1975,11 @@ class OrgDocReader:
                 elif m := RAW_LINE_RE.match(line):
                     self.add_raw_line(linenum, line)
                 # Org-babel
-                elif m := BEGIN_SRC_RE.match(line):
-                    self.add_begin_src_line(linenum, m)
+                elif m := BEGIN_BLOCK_RE.match(line):
+                    self.add_begin_block_line(linenum, m)
                     in_block = True
-                elif m := END_SRC_RE.match(line):
-                    self.add_end_src_line(linenum, m)
+                elif m := END_BLOCK_RE.match(line):
+                    self.add_end_block_line(linenum, m)
                     in_block = False
                 # Generic properties
                 elif m := KEYWORDS_RE.match(line):
