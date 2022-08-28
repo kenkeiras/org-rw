@@ -59,7 +59,7 @@ class HL:
         self.children = children
 
     def assert_matches(self, test_case: unittest.TestCase, doc):
-        test_case.assertEqual(self.title, doc.title)
+        test_case.assertEqual(self.title, get_raw(doc.title))
 
         # Check properties
         if self.props is None:

@@ -619,3 +619,18 @@ class TestSerde(unittest.TestCase):
 *** Third headline
             """.strip(),
         )
+
+
+    def test_markup_file_09(self):
+        with open(os.path.join(DIR, "09-markup-on-headline.org")) as f:
+            doc = load(f)
+
+        hl = doc.getTopHeadlines()[0]
+        print(hl.title)
+        self.assertEqual(hl.title.contents, [
+            'Headline ',
+            MarkerToken(closing=False, tok_type=MarkerType.UNDERLINED_MODE),
+            'with',
+            MarkerToken(closing=True, tok_type=MarkerType.UNDERLINED_MODE),
+            ' markup',
+        ])

@@ -266,7 +266,9 @@ class Headline:
         self.priority_start = priority_start
         self.priority = priority
         self.title_start = title_start
-        self.title = title
+        self.title = parse_content_block(
+            [RawLine(linenum=start_line, line=title)]
+        )
         self.state = state
         self.tags_start = tags_start
         self.shallow_tags = tags
@@ -1146,9 +1148,18 @@ class Text:
     def __repr__(self):
         return "{{Text line: {}; content: {} }}".format(self.linenum, self.contents)
 
+    def get_text(self):
+        return token_list_to_plaintext(self.contents)
+
     def get_raw(self):
         return token_list_to_raw(self.contents)
 
+def token_list_to_plaintext(tok_list) -> str:
+    return "".join([
+        chunk
+        for chunk in tok_list
+        if isinstance(chunk, str)
+    ])
 
 def token_list_to_raw(tok_list):
     contents = []
@@ -1683,7 +1694,7 @@ class OrgDoc:
         if headline.state:
             state = headline.state + " "
 
-        yield "*" * headline.depth + headline.spacing + state + headline.title + tags
+        yield "*" * headline.depth + headline.spacing + state + token_list_to_raw(headline.title.contents) + tags
 
         planning = headline.get_planning_line()
         if planning is not None:
