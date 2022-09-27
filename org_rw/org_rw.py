@@ -332,6 +332,7 @@ class Headline:
             self.keywords
             + self.contents
             + self.list_items
+            + self.table_rows
             + self.properties
             + self.structural
             + self.delimiters
@@ -377,20 +378,22 @@ class Headline:
                 elif isinstance(current_node, dom.LogbookDrawerNode):
                     current_node.append(dom.Text(line))
                 else:
-                    if type(current_node) not in NON_FINISHED_GROUPS:
+                    if isinstance(current_node, dom.TableNode):
+                        pass  # No problem here
+                    elif type(current_node) not in NON_FINISHED_GROUPS:
                         raise NotImplementedError('Not implemented node type: {}'.format(current_node))
                     current_node = None
                     contents = []
                     tree.append(dom.Text(text_to_dom(line.contents, line)))
 
             elif isinstance(line, ListItem):
-                if current_node is None:
+                if current_node is None or isinstance(current_node, dom.TableNode):
                     current_node = dom.ListGroupNode()
                     tree.append(current_node)
                     indentation_tree = [current_node]
                 if not isinstance(current_node, dom.ListGroupNode):
                     if not isinstance(current_node, dom.ListGroupNode):
-                        logging.warning("Expected a {}, found: {} on line {}".format(dom.ListGroupNode, current_node, line.linenum))
+                        logging.warning("Expected a {}, found: {} on line {} on {}".format(dom.ListGroupNode, current_node, line.linenum, self.doc.path))
                         # This can happen. Frequently inside a LogDrawer
 
                 if len(indentation_tree) > 0 and (
@@ -429,6 +432,22 @@ class Headline:
                         current_node = indentation_tree[-1]
 
                 node = dom.ListItem(text_to_dom(line.tag, line), text_to_dom(line.content, line), orig=line)
+                current_node.append(node)
+
+            elif isinstance(line, TableRow):
+                if current_node is None:
+                    current_node = dom.TableNode()
+                    tree.append(current_node)
+                    indentation_tree = [current_node]
+                if not isinstance(current_node, dom.TableNode):
+                    if not isinstance(current_node, dom.TableNode):
+                        logging.warning("Expected a {}, found: {} on line {}".format(dom.TableNode, current_node, line.linenum))
+                        # This can happen. Frequently inside a LogDrawer
+
+                if len(line.cells) > 0 and len(line.cells[0]) > 0 and line.cells[0][0] == '-':
+                    node = dom.TableSeparatorRow(orig=line)
+                else:
+                    node = dom.TableRow(line.cells, orig=line)
                 current_node.append(node)
 
             elif (

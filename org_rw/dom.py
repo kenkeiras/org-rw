@@ -50,6 +50,24 @@ class ListGroupNode:
     def __repr__(self):
         return "<List: {}>".format(len(self.children))
 
+class TableNode:
+    def __init__(self):
+        self.children = []
+
+    def append(self, child):
+        self.children.append(child)
+
+    def __repr__(self):
+        return "<Table: {}>".format(len(self.children))
+
+class TableSeparatorRow:
+    def __init__(self, orig=None):
+        self.orig = orig
+
+class TableRow:
+    def __init__(self, cells, orig=None):
+        self.cells = cells
+        self.orig = orig
 
 class Text:
     def __init__(self, content):
