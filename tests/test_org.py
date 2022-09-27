@@ -634,3 +634,27 @@ class TestSerde(unittest.TestCase):
             MarkerToken(closing=True, tok_type=MarkerType.UNDERLINED_MODE),
             ' markup',
         ])
+
+    def test_mimic_write_file_10(self):
+        with open(os.path.join(DIR, "10-tables.org")) as f:
+            orig = f.read()
+            doc = loads(orig)
+
+        self.assertEqual(dumps(doc), orig)
+
+    def test_tables_file_10(self):
+        with open(os.path.join(DIR, "10-tables.org")) as f:
+            doc = load(f)
+
+        hl = doc.getTopHeadlines()[0]
+
+        tables = hl.get_tables()
+        first_table = tables[0]
+        self.assertEqual(len(first_table), 4)
+
+        print(first_table[0])
+        self.assertEqual(len(first_table[0].cells), 3)
+        self.assertEqual(first_table[0].cells[0].strip(), 'Header1')
+        self.assertEqual(first_table[0].cells[1].strip(), 'Header2')
+        self.assertEqual(first_table[0].cells[2].strip(), 'Header3')
+

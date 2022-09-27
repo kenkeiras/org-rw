@@ -62,7 +62,7 @@ DRAWER_END_RE = re.compile(r"^(?P<indentation>\s*):END:(?P<end_indentation>\s*)$
 NODE_PROPERTIES_RE = re.compile(
     r"^(?P<indentation>\s*):(?P<key>[^ ()+:]+)(?P<plus>\+)?:(?P<spacing>\s*)(?P<value>.+)$"
 )
-RAW_LINE_RE = re.compile(r"^\s*([^\s#:*]|$)")
+RAW_LINE_RE = re.compile(r"^\s*([^\s#:*|]|$)")
 BASE_TIME_STAMP_RE = r"(?P<year>\d{4})-(?P<month>\d{2})-(?P<day>\d{2})( ?(?P<dow>[^ ]+))?( (?P<start_hour>\d{1,2}):(?P<start_minute>\d{1,2})(-+(?P<end_hour>\d{1,2}):(?P<end_minute>\d{1,2}))?)?(?P<repetition> (?P<rep_mark>(\+|\+\+|\.\+|-|--))(?P<rep_value>\d+)(?P<rep_unit>[hdwmy]))?"
 CLEAN_TIME_STAMP_RE = r"\d{4}-\d{2}-\d{2}( ?([^ ]+))?( (\d{1,2}):(\d{1,2})(-+(\d{1,2}):(\d{1,2}))?)?( (\+|\+\+|\.\+|-|--)\d+[hdwmy])?"
 
@@ -253,6 +253,7 @@ class Headline:
         structural,
         delimiters,
         list_items,
+        table_rows,
         parent,
         is_todo,
         is_done,
@@ -277,6 +278,7 @@ class Headline:
         self.structural = structural
         self.delimiters = delimiters
         self.list_items = list_items
+        self.table_rows = table_rows
         self.parent = parent
         self.is_todo = is_todo
         self.is_done = is_done
@@ -485,7 +487,7 @@ class Headline:
 
         return tree
 
-    def getLists(self):
+    def get_lists(self):
         lists = []
         last_line = None
 
@@ -497,6 +499,22 @@ class Headline:
 
             last_line = li.linenum
         return lists
+
+    def getLists(self):
+        return self.get_lists()
+
+    def get_tables(self):
+        tables = []
+        last_line = None
+
+        for row in self.table_rows:
+            if last_line == row.linenum - 1:
+                tables[-1].append(row)
+            else:
+                tables.append([row])
+
+            last_line = row.linenum
+        return tables
 
     def get_planning_line(self):
         if self.scheduled is None and self.closed is None and self.deadline is None:
@@ -614,7 +632,7 @@ class Headline:
         for content in self.contents:
             yield from get_links_from_content(content)
 
-        for lst in self.getLists():
+        for lst in self.get_lists():
             for item in lst:
                 yield from get_links_from_content(item.content)
 
@@ -777,6 +795,16 @@ ListItem = collections.namedtuple(
         "tag_indentation",
         "tag",
         "content",
+    ),
+)
+TableRow = collections.namedtuple(
+    "TableRow",
+    (
+        "linenum",
+        "indentation",
+        "suffix",
+        "last_cell_closed",
+        "cells",
     ),
 )
 
@@ -1484,6 +1512,13 @@ def dump_contents(raw):
             f"{raw.indentation}{bullet}{checkbox}{tag}{content}",
         )
 
+    elif isinstance(raw, TableRow):
+        closed = '|' if raw.last_cell_closed else ''
+        return (
+            raw.linenum,
+            f"{' ' * raw.indentation}|{'|'.join(raw.cells)}{closed}{raw.suffix}",
+        )
+
     return (raw.linenum, raw.get_raw())
 
 
@@ -1537,6 +1572,7 @@ def parse_headline(hl, doc, parent) -> Headline:
         structural=hl["structural"],
         delimiters=hl["delimiters"],
         list_items=hl["list_items"],
+        table_rows=hl["table_rows"],
         title_start=None,
         priority=None,
         priority_start=None,
@@ -1718,6 +1754,9 @@ class OrgDoc:
         for li in headline.list_items:
             lines.append((CONTENT_T, dump_contents(li)))
 
+        for row in headline.table_rows:
+            lines.append((CONTENT_T, dump_contents(row)))
+
         for prop in headline.properties:
             lines.append((PROPERTIES_T, dump_property(prop)))
 
@@ -1796,6 +1835,7 @@ class OrgDocReader:
         self.contents: List[RawLine] = []
         self.delimiters: List[DelimiterLine] = []
         self.list_items: List[ListItem] = []
+        self.table_rows: List[TableRow] = []
         self.structural: List = []
         self.properties: List = []
 
@@ -1828,6 +1868,7 @@ class OrgDocReader:
             "delimiters": [],
             "results": [],  # TODO: Move to each specific code block?
             "list_items": [],
+            "table_rows": [],
         }
 
         while (depth - 1) > len(self.headline_hierarchy):
@@ -1873,6 +1914,31 @@ class OrgDocReader:
             self.list_items.append(li)
         else:
             self.headline_hierarchy[-1]["list_items"].append(li)
+
+    def add_table_line(self, linenum: int, line: str) -> int:
+        chunks = line.split('|')
+        indentation = len(chunks[0])
+        if chunks[-1].strip() == '':
+            suffix = chunks[-1]
+            cells = chunks[1:-1]
+            last_cell_closed = True
+        else:
+            suffix = ''
+            cells = chunks[1:]
+            last_cell_closed = False
+
+        row = TableRow(
+            linenum,
+            indentation,
+            suffix,
+            last_cell_closed,
+            cells,
+        )
+
+        if len(self.headline_hierarchy) == 0:
+            self.table_rows.append(row)
+        else:
+            self.headline_hierarchy[-1]["table_rows"].append(row)
 
     def add_keyword_line(self, linenum: int, match: re.Match) -> int:
         options = match.group("options")
@@ -1995,6 +2061,8 @@ class OrgDocReader:
                     in_drawer = True
                 elif m := NODE_PROPERTIES_RE.match(line):
                     self.add_node_properties_line(linenum, m)
+                elif line.strip().startswith('|'):
+                    self.add_table_line(linenum, line)
                 # Not captured
                 else:
                     self.add_raw_line(linenum, line)

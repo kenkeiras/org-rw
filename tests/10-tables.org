@@ -1,0 +1,18 @@
+#+TITLE: 10-Tables
+#+DESCRIPTION: Table test
+#+TODO: TODO(t) PAUSED(p) |  DONE(d)
+
+
+* Simple table
+  :PROPERTIES:
+  :ID:       10-table-test-id
+  :CREATED:  [2020-01-01 Wed 01:01]
+  :END:
+
+  Content just before the table.
+  | Header1    | Header2    | Header3    |
+  |------------+------------+------------|
+  | Content1-1 | Content1-2 | Content1-3 (last cell unclosed)
+  | Content2-1 | Content2-2 | Content2-3 |
+  Content after the table.
+
