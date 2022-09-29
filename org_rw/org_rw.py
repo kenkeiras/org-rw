@@ -88,7 +88,7 @@ PLANNING_RE = re.compile(
     r")+\s*"
 )
 LIST_ITEM_RE = re.compile(
-    r"(?P<indentation>\s*)((?P<bullet>[*\-+])|((?P<counter>\d|[a-zA-Z])(?P<counter_sep>[.)])))((?P<checkbox_indentation>)\[(?P<checkbox_value>[ Xx])\])?((?P<tag_indentation>\s*)(?P<tag>.*?)::)?(?P<content>.*)"
+    r"(?P<indentation>\s*)((?P<bullet>[*\-+])|((?P<counter>\d|[a-zA-Z])(?P<counter_sep>[.)]))) ((?P<checkbox_indentation>)\[(?P<checkbox_value>[ Xx])\])?((?P<tag_indentation>\s*)(?P<tag>.*?)::)?(?P<content>.*)"
 )
 
 # Org-Babel
@@ -1528,7 +1528,7 @@ def dump_contents(raw):
         tag = f"{raw.tag_indentation}{token_list_to_raw(raw.tag)}::" if raw.tag else ""
         return (
             raw.linenum,
-            f"{raw.indentation}{bullet}{checkbox}{tag}{content}",
+            f"{raw.indentation}{bullet} {checkbox}{tag}{content}",
         )
 
     elif isinstance(raw, TableRow):
