@@ -1209,11 +1209,39 @@ class Text:
         return token_list_to_raw(self.contents)
 
 def token_list_to_plaintext(tok_list) -> str:
-    return "".join([
-        chunk
-        for chunk in tok_list
-        if isinstance(chunk, str)
-    ])
+    contents = []
+    in_link = False
+    in_description = False
+    link_description = []
+    link_url = []
+    for chunk in tok_list:
+        if isinstance(chunk, str):
+            if not in_link:
+                contents.append(chunk)
+            elif in_description:
+                link_description.append(chunk)
+            else:
+                link_url.append(chunk)
+        elif isinstance(chunk, LinkToken):
+            if chunk.tok_type == LinkTokenType.OPEN_LINK:
+                in_link = True
+            elif chunk.tok_type == LinkTokenType.OPEN_DESCRIPTION:
+                in_description = True
+            else:
+                assert chunk.tok_type == LinkTokenType.CLOSE
+                if not in_description:
+                    # This might happen when link doesn't have a separate description
+                    link_description = link_url
+                contents.append(''.join(link_description))
+
+                in_link = False
+                in_description = False
+                link_description = []
+                link_url = []
+        else:
+            assert isinstance(chunk, MarkerToken)
+
+    return "".join(contents)
 
 def token_list_to_raw(tok_list):
     contents = []
