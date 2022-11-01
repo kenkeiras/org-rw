@@ -378,7 +378,7 @@ class Headline:
             elif isinstance(line, Text):
                 if isinstance(current_node, dom.BlockNode):
                     current_node.append(dom.Text(line))
-                elif isinstance(current_node, dom.LogbookDrawerNode):
+                elif isinstance(current_node, dom.DrawerNode):
                     current_node.append(dom.Text(line))
                 else:
                     if isinstance(current_node, dom.TableNode):

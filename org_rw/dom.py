@@ -1,32 +1,23 @@
-class PropertyDrawerNode:
+class DrawerNode:
     def __init__(self):
         self.children = []
 
     def append(self, child):
         self.children.append(child)
+
+
+class PropertyDrawerNode(DrawerNode):
 
     def __repr__(self):
         return "<Properties: {}>".format(len(self.children))
 
 
-class LogbookDrawerNode:
-    def __init__(self):
-        self.children = []
-
-    def append(self, child):
-        self.children.append(child)
-
+class LogbookDrawerNode(DrawerNode):
     def __repr__(self):
         return "<LogBook: {}>".format(len(self.children))
 
 
-class ResultsDrawerNode:
-    def __init__(self):
-        self.children = []
-
-    def append(self, child):
-        self.children.append(child)
-
+class ResultsDrawerNode(DrawerNode):
     def __repr__(self):
         return "<Results: {}>".format(len(self.children))
 
@@ -82,12 +73,16 @@ class ListItem:
 
 
 class BlockNode:
+    def __init__(self):
+        self.children = []
+
     def append(self, child):
-        raise NotImplementedError()
+        self.children.append(child)
 
 
 class CodeBlock(BlockNode):
     def __init__(self, header, subtype):
+        super().__init__()
         self.header = header
         self.lines = None
         self.subtype = subtype
