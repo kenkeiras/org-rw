@@ -489,26 +489,15 @@ class Headline:
                 elif content.strip().upper() == ":END:":
                     if current_node is None:
                         logging.warning('Finished node (:END:) with no known starter')
-                    else:
-                        tree_up = list(tree)
-                        while len(tree_up) > 0:
-                            node = tree_up[-1]
-                            if (isinstance(
-                                    node, dom.PropertyDrawerNode
-                            ) or isinstance(
-                                node, dom.LogbookDrawerNode
-                            ) or isinstance(
-                                node, dom.ResultsDrawerNode
-                            )):
-                                tree = tree_up
-                                current_node = node
-                                break
-                            else:
-                                tree_up.pop(-1)
-                        else:
-                            raise Exception('Unexpected node ({}) on headline (id={}), line {}'.format(current_node, self.id, linenum))
-                        current_node = None
-                    tree.pop()
+                    elif not (isinstance(
+                        current_node, dom.PropertyDrawerNode
+                    ) or isinstance(
+                        current_node, dom.LogbookDrawerNode
+                    ) or isinstance(
+                        current_node, dom.ResultsDrawerNode
+                    )):
+                        raise Exception('Unexpected node: {}'.format(current_node))
+                    current_node = None
                 elif content.strip().upper() == ":RESULTS:":
                     assert current_node is None
                     current_node = dom.ResultsDrawerNode()
