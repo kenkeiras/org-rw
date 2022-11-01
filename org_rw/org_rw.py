@@ -390,13 +390,18 @@ class Headline:
                     tree.append(dom.Text(text_to_dom(line.contents, line)))
 
             elif isinstance(line, ListItem):
-                if current_node is None or isinstance(current_node, dom.TableNode):
+                if (current_node is None
+                    or isinstance(current_node, dom.TableNode)
+                    or isinstance(current_node, dom.BlockNode)
+                    or isinstance(current_node, dom.DrawerNode)
+                ):
                     current_node = dom.ListGroupNode()
-                    tree.append(current_node)
-                    indentation_tree = [current_node]
+                    if current_node is None:
+                        tree.append(current_node)
+                    indentation_tree.append(current_node)
                 if not isinstance(current_node, dom.ListGroupNode):
                     if not isinstance(current_node, dom.ListGroupNode):
-                        logging.warning("Expected a {}, found: {} on line {} on {}".format(dom.ListGroupNode, current_node, line.linenum, self.doc.path))
+                        raise Exception("Expected a {}, found: {} on line {} on {}".format(dom.ListGroupNode, current_node, line.linenum, self.doc.path))
                         # This can happen. Frequently inside a LogDrawer
 
                 if len(indentation_tree) > 0 and (
@@ -441,6 +446,7 @@ class Headline:
                 if current_node is None:
                     current_node = dom.TableNode()
                     tree.append(current_node)
+                    # TODO: Allow indentation of this element inside others
                     indentation_tree = [current_node]
                 if not isinstance(current_node, dom.TableNode):
                     if not isinstance(current_node, dom.TableNode):
@@ -482,25 +488,39 @@ class Headline:
                     assert current_node is None
                     current_node = dom.PropertyDrawerNode()
                     tree.append(current_node)
+                    # TODO: Check if this can be nested
+                    indentation_tree = [current_node]
                 elif content.strip().upper() == ":LOGBOOK:":
                     assert current_node is None
                     current_node = dom.LogbookDrawerNode()
                     tree.append(current_node)
+                    # TODO: Check if this can be nested
+                    indentation_tree = [current_node]
                 elif content.strip().upper() == ":END:":
-                    if current_node is None:
-                        logging.warning('Finished node (:END:) with no known starter')
-                    elif not (isinstance(
-                        current_node, dom.PropertyDrawerNode
-                    ) or isinstance(
-                        current_node, dom.LogbookDrawerNode
-                    ) or isinstance(
-                        current_node, dom.ResultsDrawerNode
-                    )):
-                        raise Exception('Unexpected node: {}'.format(current_node))
-                    current_node = None
+                    if current_node is None and len(indentation_tree) == 0:
+                        logging.error('Finished node (:END:) with no known starter')
+                    else:
+                        tree_up = list(indentation_tree)
+                        while len(tree_up) > 0:
+                            node = tree_up[-1]
+                            if isinstance(node, dom.DrawerNode):
+                                indentation_tree = tree_up
+                                current_node = node
+                                tree_up.pop(-1)
+                                break
+                            else:
+                                tree_up.pop(-1)
+                        else:
+                            raise Exception('Unexpected node ({}) on headline (id={}), line {}'.format(current_node, self.id, linenum))
+                        if self.id == 'd07fcf27-d6fc-41e3-a9d0-b2e2902aec23':
+                            print("Found node:", current_node)
+                        current_node = None
                 elif content.strip().upper() == ":RESULTS:":
                     assert current_node is None
                     current_node = dom.ResultsDrawerNode()
+
+                    # TODO: Allow indentation of these blocks inside others
+                    indentation_tree = [current_node]
                     tree.append(current_node)
                 else:
                     raise Exception("Unknown structural line: {}".format(line))
