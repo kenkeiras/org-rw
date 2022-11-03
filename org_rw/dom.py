@@ -7,7 +7,6 @@ class DrawerNode:
 
 
 class PropertyDrawerNode(DrawerNode):
-
     def __repr__(self):
         return "<Properties: {}>".format(len(self.children))
 
@@ -38,6 +37,9 @@ class ListGroupNode:
     def append(self, child):
         self.children.append(child)
 
+    def get_raw(self):
+        return '\n'.join([c.get_raw() for c in self.children])
+
     def __repr__(self):
         return "<List: {}>".format(len(self.children))
 
@@ -64,12 +66,18 @@ class Text:
     def __init__(self, content):
         self.content = content
 
+    def get_raw(self):
+        return ''.join(self.content.get_raw())
+
 
 class ListItem:
     def __init__(self, tag, content, orig=None):
         self.tag = tag
         self.content = content
         self.orig = orig
+
+    def get_raw(self):
+        return get_raw_contents(self.orig)
 
 
 class BlockNode:
@@ -92,3 +100,5 @@ class CodeBlock(BlockNode):
 
     def __repr__(self):
         return "<Code: {}>".format(len(self.lines))
+
+from .utils import get_raw_contents
