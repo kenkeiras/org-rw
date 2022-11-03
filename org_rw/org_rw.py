@@ -376,18 +376,32 @@ class Headline:
                 current_node.append(dom.PropertyNode(line.key, line.value))
 
             elif isinstance(line, Text):
-                if isinstance(current_node, dom.BlockNode):
-                    current_node.append(dom.Text(line))
-                elif isinstance(current_node, dom.DrawerNode):
-                    current_node.append(dom.Text(line))
+                tree_up = list(indentation_tree)
+                while len(tree_up) > 0:
+                    node = tree_up[-1]
+                    if (isinstance(node, dom.BlockNode)
+                        or isinstance(node, dom.DrawerNode)
+                    ):
+                        node.append(dom.Text(line))
+                        current_node = node
+                        contents = []
+                        break
+                    elif ((not isinstance(node, dom.TableNode)) and
+                          (type(node) not in NON_FINISHED_GROUPS)
+                    ):
+                        raise NotImplementedError('Not implemented node type: {} (headline_id={}, line={}, doc={})'.format(
+                            node,
+                            self.id,
+                            line.linenum,
+                            self.doc.path,
+                        ))
+                    else:
+                        tree_up.pop(-1)
                 else:
-                    if isinstance(current_node, dom.TableNode):
-                        pass  # No problem here
-                    elif type(current_node) not in NON_FINISHED_GROUPS:
-                        raise NotImplementedError('Not implemented node type: {}'.format(current_node))
                     current_node = None
                     contents = []
                     tree.append(dom.Text(text_to_dom(line.contents, line)))
+                indentation_tree = tree_up
 
             elif isinstance(line, ListItem):
                 if (current_node is None
@@ -434,7 +448,7 @@ class Headline:
                     )
                     > len(line.indentation)
                 ):
-                    rem = indentation_tree.pop()
+                    rem = indentation_tree.pop(-1)
                     if len(indentation_tree) == 0:
                         indentation_tree.append(rem)
                         current_node = rem
@@ -515,8 +529,6 @@ class Headline:
                                 tree_up.pop(-1)
                         else:
                             raise Exception('Unexpected node ({}) on headline (id={}), line {}'.format(current_node, self.id, linenum))
-                        if self.id == 'd07fcf27-d6fc-41e3-a9d0-b2e2902aec23':
-                            print("Found node:", current_node)
                         current_node = None
                 elif content.strip().upper() == ":RESULTS:":
                     assert current_node is None
