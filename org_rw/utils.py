@@ -1,7 +1,9 @@
 import uuid
 
-from .org_rw import (Bold, Code, Headline, Italic, Line, RawLine, Strike, Text,
+from .org_rw import (Bold, Code, Headline, Italic, Line, RawLine, ListItem, Strike, Text,
                      Underlined, Verbatim)
+
+from .org_rw import dump_contents
 
 
 def get_hl_raw_contents(doc: Headline) -> str:
@@ -36,6 +38,8 @@ def get_raw_contents(doc) -> str:
         return "".join([get_raw_contents(chunk) for chunk in doc])
     if isinstance(doc, (Text, Bold, Code, Italic, Strike, Underlined, Verbatim)):
         return doc.get_raw()
+    if isinstance(doc, ListItem):
+        return dump_contents(doc)[1]
     print("Unhandled type: " + str(doc))
     raise NotImplementedError("Unhandled type: " + str(doc))
 
