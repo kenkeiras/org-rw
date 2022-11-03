@@ -395,9 +395,12 @@ class Headline:
                     or isinstance(current_node, dom.BlockNode)
                     or isinstance(current_node, dom.DrawerNode)
                 ):
+                    was_node = current_node
                     current_node = dom.ListGroupNode()
-                    if current_node is None:
+                    if was_node is None:
                         tree.append(current_node)
+                    else:
+                        was_node.append(current_node)
                     indentation_tree.append(current_node)
                 if not isinstance(current_node, dom.ListGroupNode):
                     if not isinstance(current_node, dom.ListGroupNode):
