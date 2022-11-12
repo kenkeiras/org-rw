@@ -51,3 +51,15 @@ Also with markup
 
 - _Key_ :: _Value_
 - /Key/ 2 :: /Value/ 2
+
+* List with multiline elements
+  :PROPERTIES:
+  :ID:       07-list-with-multiline-elements
+  :CREATED:  [2020-01-01 Wed 01:01]
+  :END:
+
+  - This is a list item...
+    that spans multiple lines
+
+  - This is another list item...
+    that has content on multiple lines

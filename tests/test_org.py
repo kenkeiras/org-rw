@@ -579,6 +579,17 @@ class TestSerde(unittest.TestCase):
         self.assertEqual(lists2[1][1].counter, "2")
         self.assertEqual(lists2[1][1].counter_sep, ")")
 
+        hl4 = doc.getTopHeadlines()[3]
+        # ...
+        lists4 = hl4.getLists()
+        print(lists4)
+        self.assertEqual(len(lists4), 1)
+
+        self.assertEqual(lists4[0][0].content, ["This is a list item...", "\n  that spans multiple lines"])
+        self.assertEqual(lists4[0][0].bullet, "-")
+        self.assertEqual(lists4[0][1].content, ["This is another list item...", "\n  that has content on multiple lines"])
+        self.assertEqual(lists4[0][1].bullet, "-")
+
     def test_org_roam_07(self):
         with open(os.path.join(DIR, "07-org-roam-v2.org")) as f:
             orig = f.read()

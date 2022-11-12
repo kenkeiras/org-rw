@@ -549,14 +549,26 @@ class Headline:
         last_line = None
 
         for li in self.list_items:
-            if last_line == li.linenum - 1:
-                lists[-1].append(li)
-            else:
+            if last_line is None:
                 lists.append([li])
+            else:
+                num_lines = li.linenum - (last_line + 1)
+                lines_between = ''.join(['\n' + l
+                                         for l in self.get_lines_between(last_line + 1, li.linenum)]
+                                        )
 
-            last_line = li.linenum
+                # Only empty lines
+                if ((num_lines == lines_between.count('\n'))
+                    and (len(lines_between.strip()) == 0)
+                ):
+                    lists[-1].append(li)
+                else:
+                    lists.append([li])
+
+            last_line = li.linenum + sum(c.count('\n') for c in li.content)
         return lists
 
+    # @DEPRECATED: use `get_lists`
     def getLists(self):
         return self.get_lists()
 
@@ -838,22 +850,30 @@ Property = collections.namedtuple(
     "Property", ("linenum", "match", "key", "value", "options")
 )
 
-ListItem = collections.namedtuple(
-    "ListItem",
-    (
-        "linenum",
-        "match",
-        "indentation",
-        "bullet",
-        "counter",
-        "counter_sep",
-        "checkbox_indentation",
-        "checkbox_value",
-        "tag_indentation",
-        "tag",
-        "content",
-    ),
-)
+class ListItem:
+    def __init__(self,
+        linenum, match,
+        indentation,
+        bullet, counter, counter_sep,
+        checkbox_indentation, checkbox_value,
+        tag_indentation, tag,
+        content,
+    ):
+        self.linenum = linenum
+        self.match = match
+        self.indentation = indentation
+        self.bullet = bullet
+        self.counter = counter
+        self.counter_sep = counter_sep
+        self.checkbox_indentation = checkbox_indentation
+        self.checkbox_value = checkbox_value
+        self.tag_indentation = tag_indentation
+        self.tag = tag
+        self.content = content
+
+    def append_line(self, line):
+        self.content += parse_content_block('\n' + line[len(self.indentation):]).contents
+
 TableRow = collections.namedtuple(
     "TableRow",
     (
@@ -1555,14 +1575,20 @@ def parse_contents(raw_contents: List[RawLine]):
     return [parse_content_block(block) for block in blocks]
 
 
-def parse_content_block(raw_contents: List[RawLine]):
+def parse_content_block(raw_contents: Union[List[RawLine],str]):
     contents_buff = []
-    for line in raw_contents:
-        contents_buff.append(line.line)
+    if isinstance(raw_contents, str):
+        contents_buff.append(raw_contents)
+    else:
+        for line in raw_contents:
+            contents_buff.append(line.line)
 
     contents = "\n".join(contents_buff)
     tokens = tokenize_contents(contents)
-    current_line = raw_contents[0].linenum
+    if isinstance(raw_contents, str):
+        current_line = None
+    else:
+        current_line = raw_contents[0].linenum
 
     contents = []
     # Use tokens to tag chunks of text with it's container type
@@ -1589,7 +1615,12 @@ def dump_contents(raw):
 
     elif isinstance(raw, ListItem):
         bullet = raw.bullet if raw.bullet else raw.counter + raw.counter_sep
-        content = token_list_to_raw(raw.content)
+        content_full = token_list_to_raw(raw.content)
+        content_lines = content_full.split('\n')
+        content = '\n'.join([content_lines[0], *[
+            raw.indentation + line
+            for line in content_lines[1:]
+        ]])
         checkbox = f"[{raw.checkbox_value}]" if raw.checkbox_value else ""
         tag = f"{raw.tag_indentation}{token_list_to_raw(raw.tag or '')}::" if raw.tag or raw.tag_indentation else ""
         return (
@@ -1978,19 +2009,19 @@ class OrgDocReader:
 
     def add_list_item_line(self, linenum: int, match: re.Match) -> int:
         li = ListItem(
-            linenum,
-            match,
-            match.group("indentation"),
-            match.group("bullet"),
-            match.group("counter"),
-            match.group("counter_sep"),
-            match.group("checkbox_indentation"),
-            match.group("checkbox_value"),
-            match.group("tag_indentation"),
-            parse_content_block(
+            linenum=linenum,
+            match=match,
+            indentation=match.group("indentation"),
+            bullet=match.group("bullet"),
+            counter=match.group("counter"),
+            counter_sep=match.group("counter_sep"),
+            checkbox_indentation=match.group("checkbox_indentation"),
+            checkbox_value=match.group("checkbox_value"),
+            tag_indentation=match.group("tag_indentation"),
+            tag=parse_content_block(
                 [RawLine(linenum=linenum, line=match.group("tag"))]
             ).contents if match.group("tag") else None,
-            parse_content_block(
+            content=parse_content_block(
                 [RawLine(linenum=linenum, line=match.group("content"))]
             ).contents,
         )
@@ -1999,6 +2030,7 @@ class OrgDocReader:
             self.list_items.append(li)
         else:
             self.headline_hierarchy[-1]["list_items"].append(li)
+        return li
 
     def add_table_line(self, linenum: int, line: str) -> int:
         chunks = line.split('|')
@@ -2108,6 +2140,22 @@ class OrgDocReader:
         reader = enumerate(lines)
         in_drawer = False
         in_block = False
+        list_item_indentation = None
+        list_item = None
+
+        def add_raw_line_with_possible_indentation(linenum, line):
+            added = False
+            nonlocal list_item
+            nonlocal list_item_indentation
+            if list_item:
+                if line.startswith(list_item_indentation):
+                    list_item.append_line(line)
+                    added = True
+                elif len(line.strip()) > 0:
+                    list_item = None
+                    list_item_indentation = None
+            if not added:
+                self.add_raw_line(linenum, line)
 
         for lnum, line in reader:
             linenum = lnum + 1
@@ -2117,14 +2165,17 @@ class OrgDocReader:
                         self.add_end_block_line(linenum, m)
                         in_block = False
                     else:
-                        self.add_raw_line(linenum, line)
+                        add_raw_line_with_possible_indentation(linenum, line)
 
                 elif m := HEADLINE_RE.match(line):
+                    list_item_indentation = None
+                    list_item = None
                     self.add_headline(linenum, m)
                 elif m := LIST_ITEM_RE.match(line):
-                    self.add_list_item_line(linenum, m)
+                    list_item = self.add_list_item_line(linenum, m)
+                    list_item_indentation = m.group("indentation")
                 elif m := RAW_LINE_RE.match(line):
-                    self.add_raw_line(linenum, line)
+                    add_raw_line_with_possible_indentation(linenum, line)
                 # Org-babel
                 elif m := BEGIN_BLOCK_RE.match(line):
                     self.add_begin_block_line(linenum, m)
@@ -2150,7 +2201,7 @@ class OrgDocReader:
                     self.add_table_line(linenum, line)
                 # Not captured
                 else:
-                    self.add_raw_line(linenum, line)
+                    add_raw_line_with_possible_indentation(linenum, line)
             except:
                 logging.error("Error line {}: {}".format(linenum + 1, line))
                 raise
