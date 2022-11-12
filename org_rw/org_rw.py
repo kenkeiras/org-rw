@@ -871,8 +871,12 @@ class ListItem:
         self.tag = tag
         self.content = content
 
+    @property
+    def text_start_pos(self):
+        return len(self.indentation) + 1 # Indentation + bullet
+
     def append_line(self, line):
-        self.content += parse_content_block('\n' + line[len(self.indentation):]).contents
+        self.content += parse_content_block('\n' + line).contents
 
 TableRow = collections.namedtuple(
     "TableRow",
@@ -1617,10 +1621,7 @@ def dump_contents(raw):
         bullet = raw.bullet if raw.bullet else raw.counter + raw.counter_sep
         content_full = token_list_to_raw(raw.content)
         content_lines = content_full.split('\n')
-        content = '\n'.join([content_lines[0], *[
-            raw.indentation + line
-            for line in content_lines[1:]
-        ]])
+        content = '\n'.join(content_lines)
         checkbox = f"[{raw.checkbox_value}]" if raw.checkbox_value else ""
         tag = f"{raw.tag_indentation}{token_list_to_raw(raw.tag or '')}::" if raw.tag or raw.tag_indentation else ""
         return (
@@ -2148,12 +2149,15 @@ class OrgDocReader:
             nonlocal list_item
             nonlocal list_item_indentation
             if list_item:
-                if line.startswith(list_item_indentation):
+                if ((line[:list_item.text_start_pos].strip() == '')
+                    or (len(line.strip()) == 0)
+                ):
                     list_item.append_line(line)
                     added = True
-                elif len(line.strip()) > 0:
+                else:
                     list_item = None
                     list_item_indentation = None
+
             if not added:
                 self.add_raw_line(linenum, line)
 
@@ -2164,6 +2168,8 @@ class OrgDocReader:
                     if m := END_BLOCK_RE.match(line):
                         self.add_end_block_line(linenum, m)
                         in_block = False
+                        list_item_indentation = None
+                        list_item = None
                     else:
                         add_raw_line_with_possible_indentation(linenum, line)
 
@@ -2180,25 +2186,37 @@ class OrgDocReader:
                 elif m := BEGIN_BLOCK_RE.match(line):
                     self.add_begin_block_line(linenum, m)
                     in_block = True
+                    list_item_indentation = None
+                    list_item = None
                 elif m := END_BLOCK_RE.match(line):
                     self.add_end_block_line(linenum, m)
                     in_block = False
+                    list_item_indentation = None
+                    list_item = None
                 # Generic properties
                 elif m := KEYWORDS_RE.match(line):
                     self.add_keyword_line(linenum, m)
                 elif m := DRAWER_END_RE.match(line):
                     self.add_drawer_end_line(linenum, line, m)
                     in_drawer = False
+                    list_item_indentation = None
+                    list_item = None
                 elif (not in_drawer) and (m := DRAWER_START_RE.match(line)):
                     self.add_property_drawer_line(linenum, line, m)
                     in_drawer = True
+                    list_item_indentation = None
+                    list_item = None
                 elif (not in_drawer) and (m := RESULTS_DRAWER_RE.match(line)):
                     self.add_results_drawer_line(linenum, line, m)
                     in_drawer = True
+                    list_item_indentation = None
+                    list_item = None
                 elif m := NODE_PROPERTIES_RE.match(line):
                     self.add_node_properties_line(linenum, m)
                 elif line.strip().startswith('|'):
                     self.add_table_line(linenum, line)
+                    list_item_indentation = None
+                    list_item = None
                 # Not captured
                 else:
                     add_raw_line_with_possible_indentation(linenum, line)

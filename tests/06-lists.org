@@ -63,3 +63,13 @@ Also with markup
 
   - This is another list item...
     that has content on multiple lines
+
+  Text after a multiline element
+
+  - This is another
+    multiline list
+
+    #+begin_quote
+    With a block element inside
+    #+end_quote
+

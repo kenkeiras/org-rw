@@ -551,7 +551,7 @@ class TestSerde(unittest.TestCase):
                 MarkerToken(closing=False, tok_type=MarkerType.UNDERLINED_MODE),
                 "markup",
                 MarkerToken(closing=True, tok_type=MarkerType.UNDERLINED_MODE),
-                ".",
+                ".", "\n"
             ],
         )
 
@@ -567,7 +567,7 @@ class TestSerde(unittest.TestCase):
         self.assertEqual(lists2[0][0].counter, "1")
         self.assertEqual(lists2[0][0].counter_sep, ".")
 
-        self.assertEqual(lists2[0][1].content, ["Second element"])
+        self.assertEqual(lists2[0][1].content, ["Second element", "\n"])
         self.assertEqual(lists2[0][1].counter, "2")
         self.assertEqual(lists2[0][1].counter_sep, ".")
 
@@ -575,7 +575,7 @@ class TestSerde(unittest.TestCase):
         self.assertEqual(lists2[1][0].counter, "1")
         self.assertEqual(lists2[1][0].counter_sep, ")")
 
-        self.assertEqual(lists2[1][1].content, ["Second element"])
+        self.assertEqual(lists2[1][1].content, ["Second element", "\n"])
         self.assertEqual(lists2[1][1].counter, "2")
         self.assertEqual(lists2[1][1].counter_sep, ")")
 
@@ -583,12 +583,15 @@ class TestSerde(unittest.TestCase):
         # ...
         lists4 = hl4.getLists()
         print(lists4)
-        self.assertEqual(len(lists4), 1)
+        self.assertEqual(len(lists4), 2)
 
-        self.assertEqual(lists4[0][0].content, ["This is a list item...", "\n  that spans multiple lines"])
+        self.assertEqual(lists4[0][0].content, ["This is a list item...", "\n    that spans multiple lines", "\n"])
         self.assertEqual(lists4[0][0].bullet, "-")
-        self.assertEqual(lists4[0][1].content, ["This is another list item...", "\n  that has content on multiple lines"])
+        self.assertEqual(lists4[0][1].content, ["This is another list item...", "\n    that has content on multiple lines", "\n"])
         self.assertEqual(lists4[0][1].bullet, "-")
+
+        self.assertEqual(lists4[1][0].content, ["This is another", "\n    multiline list", "\n"])
+        self.assertEqual(lists4[1][0].bullet, "-")
 
     def test_org_roam_07(self):
         with open(os.path.join(DIR, "07-org-roam-v2.org")) as f:
