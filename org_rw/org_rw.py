@@ -92,10 +92,10 @@ LIST_ITEM_RE = re.compile(
 )
 
 # Org-Babel
-BEGIN_BLOCK_RE = re.compile(r"^\s*#\+BEGIN_(?P<subtype>[^ ]+)(?P<content>.*)$", re.I)
+BEGIN_BLOCK_RE = re.compile(r"^\s*#\+BEGIN_(?P<subtype>[^ ]+)(?P<arguments>.*)$", re.I)
 END_BLOCK_RE = re.compile(r"^\s*#\+END_(?P<subtype>[^ ]+)\s*$", re.I)
 RESULTS_DRAWER_RE = re.compile(r"^\s*:results:\s*$", re.I)
-CodeSnippet = collections.namedtuple("CodeSnippet", ("name", "content", "result"))
+CodeSnippet = collections.namedtuple("CodeSnippet", ("name", "content", "result", "arguments"))
 
 # Groupings
 NON_FINISHED_GROUPS = (type(None), dom.ListGroupNode, dom.ResultsDrawerNode, dom.PropertyDrawerNode)
@@ -481,7 +481,7 @@ class Headline:
                 and line.delimiter_type == DelimiterLineType.BEGIN_BLOCK
             ):
                 assert type(current_node) in NON_FINISHED_GROUPS
-                current_node = dom.CodeBlock(line, line.type_data.subtype)
+                current_node = dom.CodeBlock(line, line.type_data.subtype, line.arguments)
 
             elif isinstance(line, Keyword):
                 logging.warning("Keywords not implemented on `as_dom()`")
@@ -764,11 +764,13 @@ class Headline:
         inside_code = False
 
         sections = []
+        arguments = None
 
         for delimiter in self.delimiters:
             if delimiter.delimiter_type == DelimiterLineType.BEGIN_BLOCK and delimiter.type_data.subtype.lower() == "src":
                 line_start = delimiter.linenum
                 inside_code = True
+                arguments = delimiter.arguments
             elif delimiter.delimiter_type == DelimiterLineType.END_BLOCK and delimiter.type_data.subtype.lower() == "src":
                 inside_code = False
                 start, end = line_start, delimiter.linenum
@@ -785,8 +787,10 @@ class Headline:
                         "line_first": start + 1,
                         "line_last": end - 1,
                         "content": contents,
+                        "arguments": arguments,
                     }
                 )
+                arguments = None
                 line_start = None
 
         for kword in self.keywords:
@@ -837,7 +841,8 @@ class Headline:
             name = None
             content = section["content"]
             code_result = section.get("result", None)
-            results.append(CodeSnippet(name=name, content=content, result=code_result))
+            arguments = section.get("arguments", None)
+            results.append(CodeSnippet(name=name, content=content, result=code_result, arguments=arguments))
 
         return results
 
@@ -991,7 +996,7 @@ BlockDelimiterTypeData = collections.namedtuple(
 )
 
 DelimiterLine = collections.namedtuple(
-    "DelimiterLine", ("linenum", "line", "delimiter_type", "type_data")
+    "DelimiterLine", ("linenum", "line", "delimiter_type", "type_data", "arguments")
 )
 
 
@@ -2081,7 +2086,7 @@ class OrgDocReader:
 
     def add_begin_block_line(self, linenum: int, match: re.Match):
         line = DelimiterLine(linenum, match.group(0), DelimiterLineType.BEGIN_BLOCK,
-                             BlockDelimiterTypeData(match.group("subtype")))
+                             BlockDelimiterTypeData(match.group("subtype")), match.group('arguments'))
         if len(self.headline_hierarchy) == 0:
             self.delimiters.append(line)
         else:
@@ -2089,7 +2094,7 @@ class OrgDocReader:
 
     def add_end_block_line(self, linenum: int, match: re.Match):
         line = DelimiterLine(linenum, match.group(0), DelimiterLineType.END_BLOCK,
-                             BlockDelimiterTypeData(match.group("subtype")))
+                             BlockDelimiterTypeData(match.group("subtype")), None)
         if len(self.headline_hierarchy) == 0:
             self.delimiters.append(line)
         else:

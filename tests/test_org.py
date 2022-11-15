@@ -440,6 +440,7 @@ class TestSerde(unittest.TestCase):
             + 'echo "with two lines"\n'
             + "exit 0 # Exit successfully",
         )
+        self.assertEqual(snippets[0].arguments.split(), ['shell', ':results', 'verbatim'])
         self.assertEqual(
             snippets[0].result,
             "This is a test\n" + "with two lines",
