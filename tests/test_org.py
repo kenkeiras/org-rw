@@ -433,7 +433,7 @@ class TestSerde(unittest.TestCase):
             doc = load(f)
 
         snippets = list(doc.get_code_snippets())
-        self.assertEqual(len(snippets), 2)
+        self.assertEqual(len(snippets), 3)
         self.assertEqual(
             snippets[0].content,
             'echo "This is a test"\n'
@@ -454,6 +454,14 @@ class TestSerde(unittest.TestCase):
         )
         self.assertEqual(
             snippets[1].result, "This is another test\n" + "with two lines too"
+        )
+
+        self.assertEqual(
+            snippets[2].content,
+            '/* This code has to be escaped to\n'
+            + ' * avoid confusion with new headlines.\n'
+            + ' */\n'
+            + 'main(){}',
         )
 
     def test_mimic_write_file_05(self):

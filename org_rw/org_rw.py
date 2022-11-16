@@ -154,6 +154,26 @@ class RangeInRaw:
             contents.insert(start_idx + i + 1, element)
 
 
+def unescape_block_lines(lines: str) -> str:
+    """
+    Remove leading ',' from block_lines if they escape `*` characters.
+    """
+    i = 0
+    lines = lines.split('\n')
+    while i < len(lines):
+        line = lines[i]
+        if (line.lstrip(' ').startswith(',')
+            and line.lstrip(' ,').startswith('*')
+        ):
+            # Remove leading ','
+            lead_pos = line.index(',')
+            line = line[:lead_pos] + line[lead_pos + 1:]
+            lines[i] = line
+
+        i += 1
+
+    return '\n'.join(lines)
+
 def get_links_from_content(content):
     in_link = False
     in_description = False
@@ -356,7 +376,7 @@ class Headline:
                     end = line.linenum
 
                     lines = self.get_lines_between(start + 1, end)
-                    contents = "\n".join(lines)
+                    contents = unescape_block_lines("\n".join(lines))
                     if contents.endswith("\n"):
                         # This is not ideal, but to avoid having to do this maybe
                         # the content parsing must be re-thinked
@@ -708,13 +728,7 @@ class Headline:
     def get_lines_between(self, start, end):
         for line in self.contents:
             if start <= line.linenum < end:
-                text = []
-                for item in line.contents:
-                    if isinstance(item, str):
-                        text.append(item)
-                    elif isinstance(item, MarkerType):
-                        text.append(ModeToMarker[item])
-                yield "".join(text)
+                yield "".join(line.get_raw())
 
     def get_contents(self, format):
         if format == "raw":
@@ -776,7 +790,7 @@ class Headline:
                 start, end = line_start, delimiter.linenum
 
                 lines = self.get_lines_between(start + 1, end)
-                contents = "\n".join(lines)
+                contents = unescape_block_lines("\n".join(lines))
                 if contents.endswith("\n"):
                     # This is not ideal, but to avoid having to do this maybe
                     # the content parsing must be re-thinked

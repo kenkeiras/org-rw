@@ -36,3 +36,16 @@ exit 0 # Comment
     This is another test
     with two lines too
     :end:
+
+* Escaped code
+    :PROPERTIES:
+    :ID:       04-code-escaped-code-id
+    :CREATED:  [2020-01-01 Wed 01:01]
+    :END:
+
+    #+BEGIN_SRC c :results drawer
+/* This code has to be escaped to
+ ,* avoid confusion with new headlines.
+ ,*/
+main(){}
+    #+END_SRC
