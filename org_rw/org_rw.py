@@ -457,17 +457,20 @@ class Headline:
                     current_node = sublist
                     indentation_tree.append(current_node)
 
-                while len(indentation_tree) > 0 and (
-                    (len(indentation_tree[-1].children) > 0)
-                    and len(
-                        [
-                            c
-                            for c in indentation_tree[-1].children
-                            if isinstance(c, dom.ListItem)
-                        ][-1].orig.indentation
-                    )
-                    > len(line.indentation)
-                ):
+                while len(indentation_tree) > 0:
+                    list_children = [
+                        c
+                        for c in indentation_tree[-1].children
+                        if isinstance(c, dom.ListItem)
+                    ]
+
+                    if ((len(list_children) > 0)
+                        and (len(list_children[-1].orig.indentation)
+                             <= len(line.indentation))):
+                        # No more breaking out of lists, it's indentation
+                        # is less than ours
+                        break
+
                     rem = indentation_tree.pop(-1)
                     if len(indentation_tree) == 0:
                         indentation_tree.append(rem)
