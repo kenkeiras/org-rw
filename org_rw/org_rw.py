@@ -488,9 +488,15 @@ class Headline:
                     tree.append(current_node)
                     # TODO: Allow indentation of this element inside others
                     indentation_tree = [current_node]
-                if not isinstance(current_node, dom.TableNode):
-                    if not isinstance(current_node, dom.TableNode):
-                        logging.warning("Expected a {}, found: {} on line {}".format(dom.TableNode, current_node, line.linenum))
+                elif not isinstance(current_node, dom.TableNode):
+                    if isinstance(current_node, dom.ListGroupNode):
+                        # As an item inside a list
+                        list_node = current_node
+                        current_node = dom.TableNode()
+                        list_node.append(current_node)
+                        indentation_tree.append(current_node)
+                    else:
+                        logging.debug("Expected a {}, found: {} on line {}".format(dom.TableNode, current_node, line.linenum))
                         # This can happen. Frequently inside a LogDrawer
 
                 if len(line.cells) > 0 and len(line.cells[0]) > 0 and line.cells[0][0] == '-':

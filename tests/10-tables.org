@@ -16,3 +16,18 @@
   | Content2-1 | Content2-2 | Content2-3 |
   Content after the table.
 
+** Indented table
+:PROPERTIES:
+:ID:       10-table-test-id-02-indented
+:CREATED:  [2020-01-01 Wed 01:01]
+:END:
+
+- This table is indented inside a list item.
+  - Item before in list
+
+  | Header1    | Header2    | Header3    |
+  |------------+------------+------------|
+  | Content1-1 | Content1-2 | Content1-3 (last cell unclosed)
+  | Content2-1 | Content2-2 | Content2-3 |
+  - Item after in list
+- This item happens after the indented table.

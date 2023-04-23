@@ -4,7 +4,8 @@ import unittest
 from datetime import date
 from datetime import datetime as DT
 
-from org_rw import MarkerToken, MarkerType, Timestamp, dumps, load, loads
+from org_rw import MarkerToken, MarkerType, Timestamp, dumps, load, loads, dom
+import org_rw
 
 from utils.assertions import (BOLD, CODE, HL, ITALIC, SPAN, STRIKE, UNDERLINED,
                               VERBATIM, WEB_LINK, Doc, Tokens)
@@ -681,3 +682,66 @@ class TestSerde(unittest.TestCase):
         self.assertEqual(first_table[0].cells[1].strip(), 'Header2')
         self.assertEqual(first_table[0].cells[2].strip(), 'Header3')
 
+        hl = hl.children[0]
+
+        tables = hl.get_tables()
+        first_table = tables[0]
+        self.assertEqual(len(first_table), 4)
+
+        print(first_table[0])
+        self.assertEqual(len(first_table[0].cells), 3)
+        self.assertEqual(first_table[0].cells[0].strip(), 'Header1')
+        self.assertEqual(first_table[0].cells[1].strip(), 'Header2')
+        self.assertEqual(first_table[0].cells[2].strip(), 'Header3')
+
+    def test_tables_html_file_10(self):
+        with open(os.path.join(DIR, "10-tables.org")) as f:
+            doc = load(f)
+
+        hl = doc.getTopHeadlines()[0]
+
+        tree = hl.as_dom()
+        non_props = [
+            item
+            for item in tree
+            if not isinstance(item, dom.PropertyDrawerNode)
+        ]
+        self.assertTrue(isinstance(non_props[0], dom.Text)
+                        and isinstance(non_props[1], dom.TableNode)
+                        and isinstance(non_props[2], dom.Text),
+                        'Expected <Text><Table><Text>')
+
+
+        hl = hl.children[0]
+        tree = hl.as_dom()
+        non_props = [
+            item
+            for item in tree
+            if not (isinstance(item, dom.PropertyDrawerNode)
+                    or isinstance(item, dom.Text))
+        ]
+        print_tree(non_props)
+        self.assertTrue(len(non_props) == 1,
+                        'Expected <List>, with only (1) element')
+
+
+def print_tree(tree, indentation=0, headline=None):
+    for element in tree:
+        print(" " * indentation * 2, "EL:", element)
+        if "children" in dir(element):
+            if len(element.children) > 0:
+                print_element(element.children, indentation + 1, headline)
+                print()
+
+        elif "content" in dir(element):
+            for content in element.content:
+                print_element(content, indentation + 1, headline)
+
+
+def print_element(element, indentation, headline):
+    if isinstance(element, org_rw.Link):
+        print(" " * indentation * 2, "Link:", element.get_raw())
+    elif isinstance(element, str):
+        print(" " * indentation * 2, "Str[" + element.replace('\n', '<NL>') + "]", type(element))
+    else:
+        print_tree(element, indentation, headline)
