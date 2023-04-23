@@ -1067,6 +1067,8 @@ def token_from_type(tok_type):
 
 class TimeRange:
     def __init__(self, start_time: OrgTime, end_time: OrgTime):
+        assert start_time is not None
+        assert end_time is not None
         self.start_time = start_time
         self.end_time = end_time
 
