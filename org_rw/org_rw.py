@@ -464,8 +464,9 @@ class Headline:
                         if isinstance(c, dom.ListItem)
                     ]
 
-                    if ((len(list_children) > 0)
-                        and (len(list_children[-1].orig.indentation)
+                    if (len(list_children) == 0):
+                        break
+                    if ((len(list_children[-1].orig.indentation)
                              <= len(line.indentation))):
                         # No more breaking out of lists, it's indentation
                         # is less than ours

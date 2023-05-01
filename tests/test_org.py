@@ -724,6 +724,39 @@ class TestSerde(unittest.TestCase):
         self.assertTrue(len(non_props) == 1,
                         'Expected <List>, with only (1) element')
 
+    def test_nested_lists_html_file_11(self):
+        with open(os.path.join(DIR, "11-nested-lists.org")) as f:
+            doc = load(f)
+
+        hl = doc.getTopHeadlines()[0]
+
+        tree = hl.as_dom()
+        non_props = [
+            item
+            for item in tree
+            if not isinstance(item, dom.PropertyDrawerNode)
+        ]
+        print_tree(non_props)
+        self.assertTrue((len(non_props) == 1) and (isinstance(non_props[0], dom.ListGroupNode)),
+                        'Expected only <List> as top level')
+
+        dom_list = non_props[0]
+        children = dom_list.children
+        self.assertTrue(len(children) == 5, 'Expected 5 items inside <List>, 3 texts and 2 sublists')
+
+        # Assert texts
+        self.assertEqual(children[0].content, ['1'])
+        self.assertEqual(children[2].content, ['2'])
+        self.assertEqual(children[4].content[0], '3')  # Might be ['3', '\n'] but shouldn't be a breaking change
+
+        # Assert lists
+        self.assertTrue(isinstance(children[1], dom.ListGroupNode), 'Expected sublist inside "1"')
+        self.assertEqual(children[1].children[0].content, ['1.1'])
+        self.assertEqual(children[1].children[1].content, ['1.2'])
+        self.assertTrue(isinstance(children[3], dom.ListGroupNode), 'Expected sublist inside "2"')
+        self.assertEqual(children[3].children[0].content, ['2.1'])
+        self.assertEqual(children[3].children[1].content, ['2.2'])
+
 
 def print_tree(tree, indentation=0, headline=None):
     for element in tree:
