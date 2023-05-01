@@ -1,5 +1,5 @@
-#+TITLE: 06-Links
-#+DESCRIPTION: Simple org file to test links
+#+TITLE: 06-Lists
+#+DESCRIPTION: Simple org file to test lists
 #+TODO: TODO(t) PAUSED(p) |  DONE(d)
 
 
