@@ -733,6 +733,8 @@ class Headline:
 
         for lst in self.get_lists():
             for item in lst:
+                if item.tag:
+                    yield from  get_links_from_content(item.tag)
                 yield from get_links_from_content(item.content)
 
     def get_lines_between(self, start, end):
