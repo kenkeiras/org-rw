@@ -680,6 +680,9 @@ class Headline:
         else:
             return list(self.shallow_tags) + self.parent.tags
 
+    def add_tag(self, tag: str):
+        self.shallow_tags.append(tag)
+
     def get_property(self, name: str, default=None):
         for prop in self.properties:
             if prop.key == name:
@@ -871,6 +874,35 @@ class Headline:
             results.append(CodeSnippet(name=name, content=content, result=code_result, arguments=arguments))
 
         return results
+
+    def create_headline_at_end(self) -> Headline:
+        headline = Headline(
+            start_line=1,
+            depth=self.depth + 1,
+            orig=None,
+            properties=[],
+            keywords=[],
+            priority_start=None,
+            priority=None,
+            title_start=None,
+            title="",
+            state="",
+            tags_start=None,
+            tags=[],
+            contents=[],
+            children=[],
+            structural=[],
+            delimiters=[],
+            list_items=[],
+            table_rows=[],
+            parent=self,
+            is_todo=False,
+            is_done=False,
+            spacing=" ",
+        )
+
+        self.children.append(headline)
+        return headline
 
 
 RawLine = collections.namedtuple("RawLine", ("linenum", "line"))
@@ -1884,7 +1916,12 @@ class OrgDoc:
         if headline.state:
             state = headline.state + " "
 
-        yield "*" * headline.depth + headline.spacing + state + token_list_to_raw(headline.title.contents) + tags
+        raw_title = token_list_to_raw(headline.title.contents)
+        tags_padding = ""
+        if not raw_title.endswith(" ") and tags:
+            tags_padding = " "
+
+        yield "*" * headline.depth + headline.spacing + state + raw_title + tags_padding + tags
 
         planning = headline.get_planning_line()
         if planning is not None:
