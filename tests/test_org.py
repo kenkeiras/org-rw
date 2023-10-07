@@ -4,7 +4,8 @@ import unittest
 from datetime import date
 from datetime import datetime as DT
 
-from org_rw import MarkerToken, MarkerType, Timestamp, dumps, load, loads
+from org_rw import MarkerToken, MarkerType, Timestamp, dumps, load, loads, dom
+import org_rw
 
 from utils.assertions import (BOLD, CODE, HL, ITALIC, SPAN, STRIKE, UNDERLINED,
                               VERBATIM, WEB_LINK, Doc, Tokens)
@@ -433,13 +434,14 @@ class TestSerde(unittest.TestCase):
             doc = load(f)
 
         snippets = list(doc.get_code_snippets())
-        self.assertEqual(len(snippets), 2)
+        self.assertEqual(len(snippets), 3)
         self.assertEqual(
             snippets[0].content,
             'echo "This is a test"\n'
             + 'echo "with two lines"\n'
             + "exit 0 # Exit successfully",
         )
+        self.assertEqual(snippets[0].arguments.split(), ['shell', ':results', 'verbatim'])
         self.assertEqual(
             snippets[0].result,
             "This is a test\n" + "with two lines",
@@ -453,6 +455,14 @@ class TestSerde(unittest.TestCase):
         )
         self.assertEqual(
             snippets[1].result, "This is another test\n" + "with two lines too"
+        )
+
+        self.assertEqual(
+            snippets[2].content,
+            '/* This code has to be escaped to\n'
+            + ' * avoid confusion with new headlines.\n'
+            + ' */\n'
+            + 'main(){}',
         )
 
     def test_mimic_write_file_05(self):
@@ -551,7 +561,7 @@ class TestSerde(unittest.TestCase):
                 MarkerToken(closing=False, tok_type=MarkerType.UNDERLINED_MODE),
                 "markup",
                 MarkerToken(closing=True, tok_type=MarkerType.UNDERLINED_MODE),
-                ".",
+                ".", "\n"
             ],
         )
 
@@ -567,7 +577,7 @@ class TestSerde(unittest.TestCase):
         self.assertEqual(lists2[0][0].counter, "1")
         self.assertEqual(lists2[0][0].counter_sep, ".")
 
-        self.assertEqual(lists2[0][1].content, ["Second element"])
+        self.assertEqual(lists2[0][1].content, ["Second element", "\n"])
         self.assertEqual(lists2[0][1].counter, "2")
         self.assertEqual(lists2[0][1].counter_sep, ".")
 
@@ -575,9 +585,23 @@ class TestSerde(unittest.TestCase):
         self.assertEqual(lists2[1][0].counter, "1")
         self.assertEqual(lists2[1][0].counter_sep, ")")
 
-        self.assertEqual(lists2[1][1].content, ["Second element"])
+        self.assertEqual(lists2[1][1].content, ["Second element", "\n"])
         self.assertEqual(lists2[1][1].counter, "2")
         self.assertEqual(lists2[1][1].counter_sep, ")")
+
+        hl4 = doc.getTopHeadlines()[3]
+        # ...
+        lists4 = hl4.getLists()
+        print(lists4)
+        self.assertEqual(len(lists4), 2)
+
+        self.assertEqual(lists4[0][0].content, ["This is a list item...", "\n    that spans multiple lines", "\n"])
+        self.assertEqual(lists4[0][0].bullet, "-")
+        self.assertEqual(lists4[0][1].content, ["This is another list item...", "\n    that has content on multiple lines", "\n"])
+        self.assertEqual(lists4[0][1].bullet, "-")
+
+        self.assertEqual(lists4[1][0].content, ["This is another", "\n    multiline list", "\n"])
+        self.assertEqual(lists4[1][0].bullet, "-")
 
     def test_org_roam_07(self):
         with open(os.path.join(DIR, "07-org-roam-v2.org")) as f:
@@ -658,3 +682,99 @@ class TestSerde(unittest.TestCase):
         self.assertEqual(first_table[0].cells[1].strip(), 'Header2')
         self.assertEqual(first_table[0].cells[2].strip(), 'Header3')
 
+        hl = hl.children[0]
+
+        tables = hl.get_tables()
+        first_table = tables[0]
+        self.assertEqual(len(first_table), 4)
+
+        print(first_table[0])
+        self.assertEqual(len(first_table[0].cells), 3)
+        self.assertEqual(first_table[0].cells[0].strip(), 'Header1')
+        self.assertEqual(first_table[0].cells[1].strip(), 'Header2')
+        self.assertEqual(first_table[0].cells[2].strip(), 'Header3')
+
+    def test_tables_html_file_10(self):
+        with open(os.path.join(DIR, "10-tables.org")) as f:
+            doc = load(f)
+
+        hl = doc.getTopHeadlines()[0]
+
+        tree = hl.as_dom()
+        non_props = [
+            item
+            for item in tree
+            if not isinstance(item, dom.PropertyDrawerNode)
+        ]
+        self.assertTrue(isinstance(non_props[0], dom.Text)
+                        and isinstance(non_props[1], dom.TableNode)
+                        and isinstance(non_props[2], dom.Text),
+                        'Expected <Text><Table><Text>')
+
+
+        hl = hl.children[0]
+        tree = hl.as_dom()
+        non_props = [
+            item
+            for item in tree
+            if not (isinstance(item, dom.PropertyDrawerNode)
+                    or isinstance(item, dom.Text))
+        ]
+        print_tree(non_props)
+        self.assertTrue(len(non_props) == 1,
+                        'Expected <List>, with only (1) element')
+
+    def test_nested_lists_html_file_11(self):
+        with open(os.path.join(DIR, "11-nested-lists.org")) as f:
+            doc = load(f)
+
+        hl = doc.getTopHeadlines()[0]
+
+        tree = hl.as_dom()
+        non_props = [
+            item
+            for item in tree
+            if not isinstance(item, dom.PropertyDrawerNode)
+        ]
+        print_tree(non_props)
+        self.assertTrue((len(non_props) == 1) and (isinstance(non_props[0], dom.ListGroupNode)),
+                        'Expected only <List> as top level')
+
+        dom_list = non_props[0]
+        children = dom_list.children
+        self.assertTrue(len(children) == 5, 'Expected 5 items inside <List>, 3 texts and 2 sublists')
+
+        # Assert texts
+        self.assertEqual(children[0].content, ['1'])
+        self.assertEqual(children[2].content, ['2'])
+        self.assertEqual(children[4].content[0], '3')  # Might be ['3', '\n'] but shouldn't be a breaking change
+
+        # Assert lists
+        self.assertTrue(isinstance(children[1], dom.ListGroupNode), 'Expected sublist inside "1"')
+        self.assertEqual(children[1].children[0].content, ['1.1'])
+        self.assertEqual(children[1].children[1].content, ['1.2'])
+        self.assertTrue(isinstance(children[3], dom.ListGroupNode), 'Expected sublist inside "2"')
+        self.assertEqual(children[3].children[0].content, ['2.1'])
+        self.assertEqual(children[3].children[1].content, ['2.2'])
+
+
+def print_tree(tree, indentation=0, headline=None):
+    for element in tree:
+        print(" " * indentation * 2, "EL:", element)
+        if "children" in dir(element):
+            if len(element.children) > 0:
+                print_element(element.children, indentation + 1, headline)
+                print()
+
+        elif "content" in dir(element):
+            for content in element.content:
+                print_element(content, indentation + 1, headline)
+
+
+def print_element(element, indentation, headline):
+    if isinstance(element, org_rw.Link):
+        print(" " * indentation * 2, "Link:", element.get_raw())
+    elif isinstance(element, str):
+        print(" " * indentation * 2, "Str[" + element.replace('\n', '<NL>') + "]", type(element))
+    else:
+        print_tree(element, indentation, headline)

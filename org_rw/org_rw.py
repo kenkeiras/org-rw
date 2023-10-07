@@ -92,10 +92,10 @@ LIST_ITEM_RE = re.compile(
 )
 
 # Org-Babel
-BEGIN_BLOCK_RE = re.compile(r"^\s*#\+BEGIN_(?P<subtype>[^ ]+)(?P<content>.*)$", re.I)
+BEGIN_BLOCK_RE = re.compile(r"^\s*#\+BEGIN_(?P<subtype>[^ ]+)(?P<arguments>.*)$", re.I)
 END_BLOCK_RE = re.compile(r"^\s*#\+END_(?P<subtype>[^ ]+)\s*$", re.I)
 RESULTS_DRAWER_RE = re.compile(r"^\s*:results:\s*$", re.I)
-CodeSnippet = collections.namedtuple("CodeSnippet", ("name", "content", "result"))
+CodeSnippet = collections.namedtuple("CodeSnippet", ("name", "content", "result", "arguments"))
 
 # Groupings
 NON_FINISHED_GROUPS = (type(None), dom.ListGroupNode, dom.ResultsDrawerNode, dom.PropertyDrawerNode)
@@ -153,6 +153,26 @@ class RangeInRaw:
         for i, element in enumerate(new_contents):
             contents.insert(start_idx + i + 1, element)
 
+
+def unescape_block_lines(lines: str) -> str:
+    """
+    Remove leading ',' from block_lines if they escape `*` characters.
+    """
+    i = 0
+    lines = lines.split('\n')
+    while i < len(lines):
+        line = lines[i]
+        if (line.lstrip(' ').startswith(',')
+            and line.lstrip(' ,').startswith('*')
+        ):
+            # Remove leading ','
+            lead_pos = line.index(',')
+            line = line[:lead_pos] + line[lead_pos + 1:]
+            lines[i] = line
+
+        i += 1
+
+    return '\n'.join(lines)
 
 def get_links_from_content(content):
     in_link = False
@@ -356,7 +376,7 @@ class Headline:
                     end = line.linenum
 
                     lines = self.get_lines_between(start + 1, end)
-                    contents = "\n".join(lines)
+                    contents = unescape_block_lines("\n".join(lines))
                     if contents.endswith("\n"):
                         # This is not ideal, but to avoid having to do this maybe
                         # the content parsing must be re-thinked
@@ -376,18 +396,32 @@ class Headline:
                 current_node.append(dom.PropertyNode(line.key, line.value))
 
             elif isinstance(line, Text):
-                if isinstance(current_node, dom.BlockNode):
-                    current_node.append(dom.Text(line))
-                elif isinstance(current_node, dom.DrawerNode):
-                    current_node.append(dom.Text(line))
+                tree_up = list(indentation_tree)
+                while len(tree_up) > 0:
+                    node = tree_up[-1]
+                    if (isinstance(node, dom.BlockNode)
+                        or isinstance(node, dom.DrawerNode)
+                    ):
+                        node.append(dom.Text(line))
+                        current_node = node
+                        contents = []
+                        break
+                    elif ((not isinstance(node, dom.TableNode)) and
+                          (type(node) not in NON_FINISHED_GROUPS)
+                    ):
+                        raise NotImplementedError('Not implemented node type: {} (headline_id={}, line={}, doc={})'.format(
+                            node,
+                            self.id,
+                            line.linenum,
+                            self.doc.path,
+                        ))
+                    else:
+                        tree_up.pop(-1)
                 else:
-                    if isinstance(current_node, dom.TableNode):
-                        pass  # No problem here
-                    elif type(current_node) not in NON_FINISHED_GROUPS:
-                        raise NotImplementedError('Not implemented node type: {}'.format(current_node))
                     current_node = None
                     contents = []
                     tree.append(dom.Text(text_to_dom(line.contents, line)))
+                indentation_tree = tree_up
 
             elif isinstance(line, ListItem):
                 if (current_node is None
@@ -395,9 +429,12 @@ class Headline:
                     or isinstance(current_node, dom.BlockNode)
                     or isinstance(current_node, dom.DrawerNode)
                 ):
+                    was_node = current_node
                     current_node = dom.ListGroupNode()
-                    if current_node is None:
+                    if was_node is None:
                         tree.append(current_node)
+                    else:
+                        was_node.append(current_node)
                     indentation_tree.append(current_node)
                 if not isinstance(current_node, dom.ListGroupNode):
                     if not isinstance(current_node, dom.ListGroupNode):
@@ -420,18 +457,22 @@ class Headline:
                     current_node = sublist
                     indentation_tree.append(current_node)
 
-                while len(indentation_tree) > 0 and (
-                    (len(indentation_tree[-1].children) > 0)
-                    and len(
-                        [
-                            c
-                            for c in indentation_tree[-1].children
-                            if isinstance(c, dom.ListItem)
-                        ][-1].orig.indentation
-                    )
-                    > len(line.indentation)
-                ):
-                    rem = indentation_tree.pop()
+                while len(indentation_tree) > 0:
+                    list_children = [
+                        c
+                        for c in indentation_tree[-1].children
+                        if isinstance(c, dom.ListItem)
+                    ]
+
+                    if (len(list_children) == 0):
+                        break
+                    if ((len(list_children[-1].orig.indentation)
+                             <= len(line.indentation))):
+                        # No more breaking out of lists, it's indentation
+                        # is less than ours
+                        break
+
+                    rem = indentation_tree.pop(-1)
                     if len(indentation_tree) == 0:
                         indentation_tree.append(rem)
                         current_node = rem
@@ -448,9 +489,15 @@ class Headline:
                     tree.append(current_node)
                     # TODO: Allow indentation of this element inside others
                     indentation_tree = [current_node]
-                if not isinstance(current_node, dom.TableNode):
-                    if not isinstance(current_node, dom.TableNode):
-                        logging.warning("Expected a {}, found: {} on line {}".format(dom.TableNode, current_node, line.linenum))
+                elif not isinstance(current_node, dom.TableNode):
+                    if isinstance(current_node, dom.ListGroupNode):
+                        # As an item inside a list
+                        list_node = current_node
+                        current_node = dom.TableNode()
+                        list_node.append(current_node)
+                        indentation_tree.append(current_node)
+                    else:
+                        logging.debug("Expected a {}, found: {} on line {}".format(dom.TableNode, current_node, line.linenum))
                         # This can happen. Frequently inside a LogDrawer
 
                 if len(line.cells) > 0 and len(line.cells[0]) > 0 and line.cells[0][0] == '-':
@@ -464,7 +511,7 @@ class Headline:
                 and line.delimiter_type == DelimiterLineType.BEGIN_BLOCK
             ):
                 assert type(current_node) in NON_FINISHED_GROUPS
-                current_node = dom.CodeBlock(line, line.type_data.subtype)
+                current_node = dom.CodeBlock(line, line.type_data.subtype, line.arguments)
 
             elif isinstance(line, Keyword):
                 logging.warning("Keywords not implemented on `as_dom()`")
@@ -512,8 +559,6 @@ class Headline:
                                 tree_up.pop(-1)
                         else:
                             raise Exception('Unexpected node ({}) on headline (id={}), line {}'.format(current_node, self.id, linenum))
-                        if self.id == 'd07fcf27-d6fc-41e3-a9d0-b2e2902aec23':
-                            print("Found node:", current_node)
                         current_node = None
                 elif content.strip().upper() == ":RESULTS:":
                     assert current_node is None
@@ -534,14 +579,26 @@ class Headline:
         last_line = None
 
         for li in self.list_items:
-            if last_line == li.linenum - 1:
-                lists[-1].append(li)
-            else:
+            if last_line is None:
                 lists.append([li])
+            else:
+                num_lines = li.linenum - (last_line + 1)
+                lines_between = ''.join(['\n' + l
+                                         for l in self.get_lines_between(last_line + 1, li.linenum)]
+                                        )
 
-            last_line = li.linenum
+                # Only empty lines
+                if ((num_lines == lines_between.count('\n'))
+                    and (len(lines_between.strip()) == 0)
+                ):
+                    lists[-1].append(li)
+                else:
+                    lists.append([li])
+
+            last_line = li.linenum + sum(c.count('\n') for c in li.content)
         return lists
 
+    # @DEPRECATED: use `get_lists`
     def getLists(self):
         return self.get_lists()
 
@@ -623,6 +680,9 @@ class Headline:
         else:
             return list(self.shallow_tags) + self.parent.tags
 
+    def add_tag(self, tag: str):
+        self.shallow_tags.append(tag)
+
     def get_property(self, name: str, default=None):
         for prop in self.properties:
             if prop.key == name:
@@ -676,18 +736,14 @@ class Headline:
 
         for lst in self.get_lists():
             for item in lst:
+                if item.tag:
+                    yield from  get_links_from_content(item.tag)
                 yield from get_links_from_content(item.content)
 
     def get_lines_between(self, start, end):
         for line in self.contents:
             if start <= line.linenum < end:
-                text = []
-                for item in line.contents:
-                    if isinstance(item, str):
-                        text.append(item)
-                    elif isinstance(item, MarkerType):
-                        text.append(ModeToMarker[item])
-                yield "".join(text)
+                yield "".join(line.get_raw())
 
     def get_contents(self, format):
         if format == "raw":
@@ -737,17 +793,19 @@ class Headline:
         inside_code = False
 
         sections = []
+        arguments = None
 
         for delimiter in self.delimiters:
             if delimiter.delimiter_type == DelimiterLineType.BEGIN_BLOCK and delimiter.type_data.subtype.lower() == "src":
                 line_start = delimiter.linenum
                 inside_code = True
+                arguments = delimiter.arguments
             elif delimiter.delimiter_type == DelimiterLineType.END_BLOCK and delimiter.type_data.subtype.lower() == "src":
                 inside_code = False
                 start, end = line_start, delimiter.linenum
 
                 lines = self.get_lines_between(start + 1, end)
-                contents = "\n".join(lines)
+                contents = unescape_block_lines("\n".join(lines))
                 if contents.endswith("\n"):
                     # This is not ideal, but to avoid having to do this maybe
                     # the content parsing must be re-thinked
@@ -758,8 +816,10 @@ class Headline:
                         "line_first": start + 1,
                         "line_last": end - 1,
                         "content": contents,
+                        "arguments": arguments,
                     }
                 )
+                arguments = None
                 line_start = None
 
         for kword in self.keywords:
@@ -810,9 +870,39 @@ class Headline:
             name = None
             content = section["content"]
             code_result = section.get("result", None)
-            results.append(CodeSnippet(name=name, content=content, result=code_result))
+            arguments = section.get("arguments", None)
+            results.append(CodeSnippet(name=name, content=content, result=code_result, arguments=arguments))
 
         return results
+
+    def create_headline_at_end(self) -> Headline:
+        headline = Headline(
+            start_line=1,
+            depth=self.depth + 1,
+            orig=None,
+            properties=[],
+            keywords=[],
+            priority_start=None,
+            priority=None,
+            title_start=None,
+            title="",
+            state="",
+            tags_start=None,
+            tags=[],
+            contents=[],
+            children=[],
+            structural=[],
+            delimiters=[],
+            list_items=[],
+            table_rows=[],
+            parent=self,
+            is_todo=False,
+            is_done=False,
+            spacing=" ",
+        )
+
+        self.children.append(headline)
+        return headline
 
 
 RawLine = collections.namedtuple("RawLine", ("linenum", "line"))
@@ -823,22 +913,34 @@ Property = collections.namedtuple(
     "Property", ("linenum", "match", "key", "value", "options")
 )
 
-ListItem = collections.namedtuple(
-    "ListItem",
-    (
-        "linenum",
-        "match",
-        "indentation",
-        "bullet",
-        "counter",
-        "counter_sep",
-        "checkbox_indentation",
-        "checkbox_value",
-        "tag_indentation",
-        "tag",
-        "content",
-    ),
-)
+class ListItem:
+    def __init__(self,
+        linenum, match,
+        indentation,
+        bullet, counter, counter_sep,
+        checkbox_indentation, checkbox_value,
+        tag_indentation, tag,
+        content,
+    ):
+        self.linenum = linenum
+        self.match = match
+        self.indentation = indentation
+        self.bullet = bullet
+        self.counter = counter
+        self.counter_sep = counter_sep
+        self.checkbox_indentation = checkbox_indentation
+        self.checkbox_value = checkbox_value
+        self.tag_indentation = tag_indentation
+        self.tag = tag
+        self.content = content
+
+    @property
+    def text_start_pos(self):
+        return len(self.indentation) + 1 # Indentation + bullet
+
+    def append_line(self, line):
+        self.content += parse_content_block('\n' + line).contents
+
 TableRow = collections.namedtuple(
     "TableRow",
     (
@@ -952,7 +1054,7 @@ BlockDelimiterTypeData = collections.namedtuple(
 )
 
 DelimiterLine = collections.namedtuple(
-    "DelimiterLine", ("linenum", "line", "delimiter_type", "type_data")
+    "DelimiterLine", ("linenum", "line", "delimiter_type", "type_data", "arguments")
 )
 
 
@@ -1000,6 +1102,8 @@ def token_from_type(tok_type):
 
 class TimeRange:
     def __init__(self, start_time: OrgTime, end_time: OrgTime):
+        assert start_time is not None
+        assert end_time is not None
         self.start_time = start_time
         self.end_time = end_time
 
@@ -1540,14 +1644,20 @@ def parse_contents(raw_contents: List[RawLine]):
     return [parse_content_block(block) for block in blocks]
 
 
-def parse_content_block(raw_contents: List[RawLine]):
+def parse_content_block(raw_contents: Union[List[RawLine],str]):
     contents_buff = []
-    for line in raw_contents:
-        contents_buff.append(line.line)
+    if isinstance(raw_contents, str):
+        contents_buff.append(raw_contents)
+    else:
+        for line in raw_contents:
+            contents_buff.append(line.line)
 
     contents = "\n".join(contents_buff)
     tokens = tokenize_contents(contents)
-    current_line = raw_contents[0].linenum
+    if isinstance(raw_contents, str):
+        current_line = None
+    else:
+        current_line = raw_contents[0].linenum
 
     contents = []
     # Use tokens to tag chunks of text with it's container type
@@ -1574,7 +1684,9 @@ def dump_contents(raw):
 
     elif isinstance(raw, ListItem):
         bullet = raw.bullet if raw.bullet else raw.counter + raw.counter_sep
-        content = token_list_to_raw(raw.content)
+        content_full = token_list_to_raw(raw.content)
+        content_lines = content_full.split('\n')
+        content = '\n'.join(content_lines)
         checkbox = f"[{raw.checkbox_value}]" if raw.checkbox_value else ""
         tag = f"{raw.tag_indentation}{token_list_to_raw(raw.tag or '')}::" if raw.tag or raw.tag_indentation else ""
         return (
@@ -1804,7 +1916,12 @@ class OrgDoc:
         if headline.state:
             state = headline.state + " "
 
-        yield "*" * headline.depth + headline.spacing + state + token_list_to_raw(headline.title.contents) + tags
+        raw_title = token_list_to_raw(headline.title.contents)
+        tags_padding = ""
+        if not raw_title.endswith(" ") and tags:
+            tags_padding = " "
+
+        yield "*" * headline.depth + headline.spacing + state + raw_title + tags_padding + tags
 
         planning = headline.get_planning_line()
         if planning is not None:
@@ -1963,19 +2080,19 @@ class OrgDocReader:
 
     def add_list_item_line(self, linenum: int, match: re.Match) -> int:
         li = ListItem(
-            linenum,
-            match,
-            match.group("indentation"),
-            match.group("bullet"),
-            match.group("counter"),
-            match.group("counter_sep"),
-            match.group("checkbox_indentation"),
-            match.group("checkbox_value"),
-            match.group("tag_indentation"),
-            parse_content_block(
+            linenum=linenum,
+            match=match,
+            indentation=match.group("indentation"),
+            bullet=match.group("bullet"),
+            counter=match.group("counter"),
+            counter_sep=match.group("counter_sep"),
+            checkbox_indentation=match.group("checkbox_indentation"),
+            checkbox_value=match.group("checkbox_value"),
+            tag_indentation=match.group("tag_indentation"),
+            tag=parse_content_block(
                 [RawLine(linenum=linenum, line=match.group("tag"))]
             ).contents if match.group("tag") else None,
-            parse_content_block(
+            content=parse_content_block(
                 [RawLine(linenum=linenum, line=match.group("content"))]
             ).contents,
         )
@@ -1984,6 +2101,7 @@ class OrgDocReader:
             self.list_items.append(li)
         else:
             self.headline_hierarchy[-1]["list_items"].append(li)
+        return li
 
     def add_table_line(self, linenum: int, line: str) -> int:
         chunks = line.split('|')
@@ -2033,7 +2151,7 @@ class OrgDocReader:
 
     def add_begin_block_line(self, linenum: int, match: re.Match):
         line = DelimiterLine(linenum, match.group(0), DelimiterLineType.BEGIN_BLOCK,
-                             BlockDelimiterTypeData(match.group("subtype")))
+                             BlockDelimiterTypeData(match.group("subtype")), match.group('arguments'))
         if len(self.headline_hierarchy) == 0:
             self.delimiters.append(line)
         else:
@@ -2041,7 +2159,7 @@ class OrgDocReader:
 
     def add_end_block_line(self, linenum: int, match: re.Match):
         line = DelimiterLine(linenum, match.group(0), DelimiterLineType.END_BLOCK,
-                             BlockDelimiterTypeData(match.group("subtype")))
+                             BlockDelimiterTypeData(match.group("subtype")), None)
         if len(self.headline_hierarchy) == 0:
             self.delimiters.append(line)
         else:
@@ -2093,6 +2211,25 @@ class OrgDocReader:
         reader = enumerate(lines)
         in_drawer = False
         in_block = False
+        list_item_indentation = None
+        list_item = None
+
+        def add_raw_line_with_possible_indentation(linenum, line):
+            added = False
+            nonlocal list_item
+            nonlocal list_item_indentation
+            if list_item:
+                if ((line[:list_item.text_start_pos].strip() == '')
+                    or (len(line.strip()) == 0)
+                ):
+                    list_item.append_line(line)
+                    added = True
+                else:
+                    list_item = None
+                    list_item_indentation = None
+
+            if not added:
+                self.add_raw_line(linenum, line)
 
         for lnum, line in reader:
             linenum = lnum + 1
@@ -2101,41 +2238,58 @@ class OrgDocReader:
                     if m := END_BLOCK_RE.match(line):
                         self.add_end_block_line(linenum, m)
                         in_block = False
+                        list_item_indentation = None
+                        list_item = None
                     else:
-                        self.add_raw_line(linenum, line)
+                        add_raw_line_with_possible_indentation(linenum, line)
 
                 elif m := HEADLINE_RE.match(line):
+                    list_item_indentation = None
+                    list_item = None
                     self.add_headline(linenum, m)
                 elif m := LIST_ITEM_RE.match(line):
-                    self.add_list_item_line(linenum, m)
+                    list_item = self.add_list_item_line(linenum, m)
+                    list_item_indentation = m.group("indentation")
                 elif m := RAW_LINE_RE.match(line):
-                    self.add_raw_line(linenum, line)
+                    add_raw_line_with_possible_indentation(linenum, line)
                 # Org-babel
                 elif m := BEGIN_BLOCK_RE.match(line):
                     self.add_begin_block_line(linenum, m)
                     in_block = True
+                    list_item_indentation = None
+                    list_item = None
                 elif m := END_BLOCK_RE.match(line):
                     self.add_end_block_line(linenum, m)
                     in_block = False
+                    list_item_indentation = None
+                    list_item = None
                 # Generic properties
                 elif m := KEYWORDS_RE.match(line):
                     self.add_keyword_line(linenum, m)
                 elif m := DRAWER_END_RE.match(line):
                     self.add_drawer_end_line(linenum, line, m)
                     in_drawer = False
+                    list_item_indentation = None
+                    list_item = None
                 elif (not in_drawer) and (m := DRAWER_START_RE.match(line)):
                     self.add_property_drawer_line(linenum, line, m)
                     in_drawer = True
+                    list_item_indentation = None
+                    list_item = None
                 elif (not in_drawer) and (m := RESULTS_DRAWER_RE.match(line)):
                     self.add_results_drawer_line(linenum, line, m)
                     in_drawer = True
+                    list_item_indentation = None
+                    list_item = None
                 elif m := NODE_PROPERTIES_RE.match(line):
                     self.add_node_properties_line(linenum, m)
                 elif line.strip().startswith('|'):
                     self.add_table_line(linenum, line)
+                    list_item_indentation = None
+                    list_item = None
                 # Not captured
                 else:
-                    self.add_raw_line(linenum, line)
+                    add_raw_line_with_possible_indentation(linenum, line)
             except:
                 logging.error("Error line {}: {}".format(linenum + 1, line))
                 raise

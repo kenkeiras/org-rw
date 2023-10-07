@@ -1,0 +1,16 @@
+#+TITLE: 11-Nested lists
+#+DESCRIPTION: Simple org file to test nested lists
+#+TODO: TODO(t) PAUSED(p) |  DONE(d)
+
+* Nested lists
+  :PROPERTIES:
+  :ID:       11-nested-lists
+  :CREATED:  [2020-01-01 Wed 01:01]
+  :END:
+  - 1
+    - 1.1
+    - 1.2
+  - 2
+    - 2.1
+    - 2.2
+  - 3
