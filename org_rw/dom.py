@@ -1,3 +1,6 @@
+from typing import Union
+
+
 class DrawerNode:
     def __init__(self):
         self.children = []
@@ -101,5 +104,16 @@ class CodeBlock(BlockNode):
 
     def __repr__(self):
         return "<Code: {}>".format(len(self.lines))
+
+DomNode = Union[DrawerNode,
+                PropertyNode,
+                ListGroupNode,
+                TableNode,
+                TableSeparatorRow,
+                TableRow,
+                Text,
+                ListItem,
+                BlockNode,
+                ]
 
 from .utils import get_raw_contents
