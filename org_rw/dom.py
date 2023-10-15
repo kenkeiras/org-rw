@@ -1,3 +1,6 @@
+from typing import List, Optional, Union
+
+
 class DrawerNode:
     def __init__(self):
         self.children = []
@@ -92,7 +95,7 @@ class CodeBlock(BlockNode):
     def __init__(self, header, subtype, arguments):
         super().__init__()
         self.header = header
-        self.lines = None
+        self.lines: Optional[List] = None
         self.subtype = subtype
         self.arguments = arguments
 
@@ -100,6 +103,23 @@ class CodeBlock(BlockNode):
         self.lines = lines
 
     def __repr__(self):
-        return "<Code: {}>".format(len(self.lines))
+        return "<Code: {}>".format(len(self.lines or []))
+
+DomNode = Union[DrawerNode,
+                PropertyNode,
+                ListGroupNode,
+                TableNode,
+                TableSeparatorRow,
+                TableRow,
+                Text,
+                ListItem,
+                BlockNode,
+                ]
+
+ContainerDomNode = Union[DrawerNode,
+                         ListGroupNode,
+                         TableNode,
+                         BlockNode,
+                         ]
 
 from .utils import get_raw_contents
