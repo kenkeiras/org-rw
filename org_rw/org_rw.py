@@ -9,7 +9,7 @@ import re
 import sys
 from datetime import date, datetime, timedelta
 from enum import Enum
-from typing import cast, Iterator, List, Optional, Tuple, Union
+from typing import cast, Iterator, List, Literal, Optional, Tuple, Union
 
 from .types import HeadlineDict
 
@@ -366,7 +366,7 @@ class Headline:
 
         tree: List[dom.DomNode] = []
         current_node: Optional[dom.DomNode] = None
-        indentation_tree: List[dom.DomNode] = []
+        indentation_tree: List[dom.ContainerDomNode] = []
         contents: Optional[str] = None
 
         for line in sorted(everything, key=get_line):
@@ -402,7 +402,7 @@ class Headline:
             elif isinstance(line, Text):
                 tree_up = list(indentation_tree)
                 while len(tree_up) > 0:
-                    node = tree_up[-1]
+                    node: dom.DomNode = tree_up[-1]
                     if (isinstance(node, dom.BlockNode)
                         or isinstance(node, dom.DrawerNode)
                     ):
@@ -508,6 +508,7 @@ class Headline:
                     node = dom.TableSeparatorRow(orig=line)
                 else:
                     node = dom.TableRow(line.cells, orig=line)
+                current_node = cast(dom.ContainerDomNode, current_node)
                 current_node.append(node)
 
             elif (
@@ -607,7 +608,7 @@ class Headline:
         return self.get_lists()
 
     def get_tables(self):
-        tables = []
+        tables: List[List] = []  # TableRow[][]
         last_line = None
 
         for row in self.table_rows:
@@ -666,6 +667,7 @@ class Headline:
 
                 time_seg = content[len("CLOCK:") :].strip()
 
+                parsed: Union[None, OrgTime, TimeRange] = None
                 if "--" in time_seg:
                     # TODO: Consider duration
                     start, end = time_seg.split("=")[0].split("--")
@@ -1307,7 +1309,7 @@ class Link:
             return "[[{}]]".format(self.value)
 
     def _update_content(self):
-        new_contents = []
+        new_contents: List[Union[str, LinkToken]] = []
         new_contents.append(self._value)
         if self._description:
             new_contents.append(LinkToken(LinkTokenType.OPEN_DESCRIPTION))
@@ -1509,9 +1511,13 @@ TOKEN_TYPE_OPEN_LINK = 3
 TOKEN_TYPE_CLOSE_LINK = 4
 TOKEN_TYPE_OPEN_DESCRIPTION = 5
 
+TokenItems = Union[
+    Tuple[int, Union[None, str, MarkerToken]],
+]
 
-def tokenize_contents(contents: str):
-    tokens = []
+
+def tokenize_contents(contents: str) -> List[TokenItems]:
+    tokens: List[TokenItems]  = []
     last_char = None
 
     text: List[str] = []
@@ -1675,14 +1681,17 @@ def parse_content_block(raw_contents: Union[List[RawLine],str]):
     else:
         current_line = raw_contents[0].linenum
 
-    contents = []
+    contents: List[Union[str, MarkerToken, LinkToken]] = []
     # Use tokens to tag chunks of text with it's container type
     for (tok_type, tok_val) in tokens:
         if tok_type == TOKEN_TYPE_TEXT:
+            assert isinstance(tok_val, str)
             contents.append(tok_val)
         elif tok_type == TOKEN_TYPE_OPEN_MARKER:
+            assert isinstance(tok_val, str)
             contents.append(MarkerToken(False, MARKERS[tok_val]))
         elif tok_type == TOKEN_TYPE_CLOSE_MARKER:
+            assert isinstance(tok_val, str)
             contents.append(MarkerToken(True, MARKERS[tok_val]))
         elif tok_type == TOKEN_TYPE_OPEN_LINK:
             contents.append(LinkToken(LinkTokenType.OPEN_LINK))
@@ -2338,6 +2347,7 @@ def loads(s, environment=BASE_ENVIRONMENT, extra_cautious=True):
                         context_start = i
                     context_last_line = i
                 elif context_start:
+                    assert context_last_line is not None
                     if i > (context_last_line + DEBUG_DIFF_CONTEXT):
                         start = max(0, context_start - DEBUG_DIFF_CONTEXT)
                         end = min(len(diff), context_last_line + DEBUG_DIFF_CONTEXT)
