@@ -1934,7 +1934,7 @@ class OrgDoc:
 
         raw_title = token_list_to_raw(headline.title.contents)
         tags_padding = ""
-        if not raw_title.endswith(" ") and tags:
+        if not (raw_title.endswith(" ") or raw_title.endswith("\t")) and tags:
             tags_padding = " "
 
         yield "*" * headline.depth + headline.spacing + state + raw_title + tags_padding + tags
