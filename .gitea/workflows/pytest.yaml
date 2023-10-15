@@ -1,0 +1,14 @@
+name: Pytest
+# run-name: ${{ gitea.actor }} is testing out Gitea Actions 🚀
+on: [push]
+
+jobs:
+  pytest:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository code
+        uses: actions/checkout@v3
+      - run: apt-get update && apt-get install -y python3-pip
+      - run: pip install -e .
+      - run: pip install pytest
+      - run: pytest
