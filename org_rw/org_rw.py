@@ -2043,7 +2043,7 @@ class OrgDocReader:
     def __init__(self):
         self.headlines: List[HeadlineDict] = []
         self.keywords: List[Keyword] = []
-        self.headline_hierarchy: List[HeadlineDict] = []
+        self.headline_hierarchy: List[Optional[HeadlineDict]] = []
         self.contents: List[RawLine] = []
         self.delimiters: List[DelimiterLine] = []
         self.list_items: List[ListItem] = []
@@ -2084,33 +2084,35 @@ class OrgDocReader:
             "table_rows": [],
         }
 
-        headline_hierarchy: List[Optional[HeadlineDict]] = list(self.headline_hierarchy)
-
-        while (depth - 1) > len(headline_hierarchy):
+        while (depth - 1) > len(self.headline_hierarchy):
             # Introduce structural headlines
-            headline_hierarchy.append(None)
-        while depth <= len(headline_hierarchy):
-            headline_hierarchy.pop()
+            self.headline_hierarchy.append(None)
+        while depth <= len(self.headline_hierarchy):
+            self.headline_hierarchy.pop()
 
         if depth == 1:
             self.headlines.append(headline)
         else:
-            parent_idx = len(headline_hierarchy) - 1
-            while headline_hierarchy[parent_idx] is None:
+            parent_idx = len(self.headline_hierarchy) - 1
+            while self.headline_hierarchy[parent_idx] is None:
                 parent_idx -= 1
-            parent_headline = headline_hierarchy[parent_idx]
+            parent_headline = self.headline_hierarchy[parent_idx]
             assert parent_headline is not None
             parent_headline["children"].append(headline)
-        headline_hierarchy.append(headline)
+        self.headline_hierarchy.append(headline)
 
-        if all([hl is not None for hl in headline_hierarchy]):
-            if not ([ len(hl['orig'].group('stars')) for hl in headline_hierarchy ]
-                    == list(range(1, len(headline_hierarchy) + 1))):
+        if all([hl is not None for hl in self.headline_hierarchy]):
+            if not ([ len(cast(HeadlineDict, hl)['orig'].group('stars')) for hl in self.headline_hierarchy ]
+                    == list(range(1, len(self.headline_hierarchy) + 1))):
                 raise AssertionError('Error on Headline Hierarchy')
         else:
-            raise AssertionError('None found on headline hierarchy')
+            # This might happen if headlines with more that 1 level deeper are found
+            pass
 
-        self.headline_hierarchy = cast(List[HeadlineDict], headline_hierarchy)
+        # We can safely assert this as all the `None`s are there to
+        #  support the addition of a `HeadlineDict` at the correct
+        #  depth but not more
+        assert self.headline_hierarchy[-1] is not None
 
     def add_list_item_line(self, linenum: int, match: re.Match) -> ListItem:
         li = ListItem(
@@ -2134,6 +2136,7 @@ class OrgDocReader:
         if len(self.headline_hierarchy) == 0:
             self.list_items.append(li)
         else:
+            assert self.headline_hierarchy[-1] is not None
             self.headline_hierarchy[-1]["list_items"].append(li)
         return li
 
@@ -2160,6 +2163,7 @@ class OrgDocReader:
         if len(self.headline_hierarchy) == 0:
             self.table_rows.append(row)
         else:
+            assert self.headline_hierarchy[-1] is not None
             self.headline_hierarchy[-1]["table_rows"].append(row)
 
     def add_keyword_line(self, linenum: int, match: re.Match):
@@ -2174,6 +2178,7 @@ class OrgDocReader:
         if len(self.headline_hierarchy) == 0:
             self.keywords.append(kw)
         else:
+            assert self.headline_hierarchy[-1] is not None
             self.headline_hierarchy[-1]["keywords"].append(kw)
 
     def add_raw_line(self, linenum: int, line: str):
@@ -2181,6 +2186,7 @@ class OrgDocReader:
         if len(self.headline_hierarchy) == 0:
             self.contents.append(raw)
         else:
+            assert self.headline_hierarchy[-1] is not None
             self.headline_hierarchy[-1]["contents"].append(raw)
 
     def add_begin_block_line(self, linenum: int, match: re.Match):
@@ -2189,6 +2195,7 @@ class OrgDocReader:
         if len(self.headline_hierarchy) == 0:
             self.delimiters.append(line)
         else:
+            assert self.headline_hierarchy[-1] is not None
             self.headline_hierarchy[-1]["delimiters"].append(line)
 
     def add_end_block_line(self, linenum: int, match: re.Match):
@@ -2197,6 +2204,7 @@ class OrgDocReader:
         if len(self.headline_hierarchy) == 0:
             self.delimiters.append(line)
         else:
+            assert self.headline_hierarchy[-1] is not None
             self.headline_hierarchy[-1]["delimiters"].append(line)
 
     def add_property_drawer_line(self, linenum: int, line: str, match: re.Match):
@@ -2204,14 +2212,17 @@ class OrgDocReader:
             self.current_drawer = self.properties
             self.structural.append((linenum, line))
         else:
+            assert self.headline_hierarchy[-1] is not None
             self.current_drawer = self.headline_hierarchy[-1]["properties"]
             self.headline_hierarchy[-1]["structural"].append((linenum, line))
 
     def add_results_drawer_line(self, linenum: int, line: str, match: re.Match):
+        assert self.headline_hierarchy[-1] is not None
         self.current_drawer = self.headline_hierarchy[-1]["results"]
         self.headline_hierarchy[-1]["structural"].append((linenum, line))
 
     def add_logbook_drawer_line(self, linenum: int, line: str, match: re.Match):
+        assert self.headline_hierarchy[-1] is not None
         self.current_drawer = self.headline_hierarchy[-1]["logbook"]
         self.headline_hierarchy[-1]["structural"].append((linenum, line))
 
@@ -2220,6 +2231,7 @@ class OrgDocReader:
         if len(self.headline_hierarchy) == 0:
             self.structural.append((linenum, line))
         else:
+            assert self.headline_hierarchy[-1] is not None
             self.headline_hierarchy[-1]["structural"].append((linenum, line))
 
     def add_node_properties_line(self, linenum: int, match: re.Match):
