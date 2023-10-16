@@ -757,6 +757,13 @@ class TestSerde(unittest.TestCase):
         self.assertEqual(children[3].children[0].content, ['2.1'])
         self.assertEqual(children[3].children[1].content, ['2.2'])
 
+    def test_mimic_write_file_12(self):
+        with open(os.path.join(DIR, "12-headlines-with-skip-levels.org")) as f:
+            orig = f.read()
+            doc = loads(orig)
+
+        self.assertEqual(dumps(doc), orig)
+
 
 def print_tree(tree, indentation=0, headline=None):
     for element in tree:
