@@ -2104,8 +2104,8 @@ class OrgDocReader:
         headline_hierarchy.append(headline)
 
         if all([hl is not None for hl in headline_hierarchy]):
-            if not ([ len(hl['orig'].group('stars')) for hl in self.headline_hierarchy ]
-                    == list(range(1, len(self.headline_hierarchy) + 1))):
+            if not ([ len(hl['orig'].group('stars')) for hl in headline_hierarchy ]
+                    == list(range(1, len(headline_hierarchy) + 1))):
                 raise AssertionError('Error on Headline Hierarchy')
         else:
             raise AssertionError('None found on headline hierarchy')
