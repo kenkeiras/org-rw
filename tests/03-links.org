@@ -21,3 +21,10 @@
   This is a [[https://codigoparallevar.com/4][[tricky web link]​]] followed up with some text.
 
   This is [[[https://codigoparallevar.com/5][another tricky web link]]] followed up with some text.
+
+* Implicit links
+  :PROPERTIES:
+  :ID:       03-markup-implicit-links
+  :CREATED:  [2020-01-01 Wed 01:01]
+  :END:
+  This is an implicit web link: https://codigoparallevar.com/implicit.

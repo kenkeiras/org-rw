@@ -202,7 +202,7 @@ class TestSerde(unittest.TestCase):
             doc = load(f)
 
         links = list(doc.get_links())
-        self.assertEqual(len(links), 7)
+        self.assertEqual(len(links), 8)
         self.assertEqual(links[0].value, "https://codigoparallevar.com/1")
         self.assertEqual(links[0].description, "web link")
 
@@ -223,6 +223,9 @@ class TestSerde(unittest.TestCase):
 
         self.assertEqual(links[6].value, "https://codigoparallevar.com/5")
         self.assertEqual(links[6].description, "another tricky web link")
+
+        self.assertEqual(links[7].value, "https://codigoparallevar.com/implicit")
+        self.assertEqual(links[7].description, "https://codigoparallevar.com/implicit")
 
         ex = Doc(
             props=[
@@ -290,8 +293,20 @@ class TestSerde(unittest.TestCase):
                             "] followed up with some text.\n",
                         ),
                     ],
-                )
-            ),
+                ),
+                HL(
+                    "Implicit links",
+                    props=[
+                        ("ID", "03-markup-implicit-links"),
+                        ("CREATED", DT(2020, 1, 1, 1, 1)),
+                    ],
+                    content=[
+                        SPAN(
+                            "  This is an implicit web link: https://codigoparallevar.com/implicit.\n",
+                        ),
+                    ],
+                ),
+            )
         )
 
         ex.assert_matches(self, doc)
@@ -301,7 +316,7 @@ class TestSerde(unittest.TestCase):
             doc = load(f)
 
         links = list(doc.get_links())
-        self.assertEqual(len(links), 7)
+        self.assertEqual(len(links), 8)
         self.assertEqual(links[0].value, "https://codigoparallevar.com/1")
         self.assertEqual(links[0].description, "web link")
         links[0].value = "https://codigoparallevar.com/1-updated"
@@ -336,6 +351,9 @@ class TestSerde(unittest.TestCase):
         self.assertEqual(links[6].description, "another tricky web link")
         links[6].value = "https://codigoparallevar.com/5-updated"
         links[6].description = "another tricky web link #5 with update"
+
+        self.assertEqual(links[7].value, "https://codigoparallevar.com/implicit")
+        self.assertEqual(links[7].description, "https://codigoparallevar.com/implicit")
 
         ex = Doc(
             props=[
@@ -416,7 +434,19 @@ class TestSerde(unittest.TestCase):
                             "] followed up with some text.\n",
                         ),
                     ],
-                )
+                ),
+                HL(
+                    "Implicit links",
+                    props=[
+                        ("ID", "03-markup-implicit-links"),
+                        ("CREATED", DT(2020, 1, 1, 1, 1)),
+                    ],
+                    content=[
+                        SPAN(
+                            "  This is an implicit web link: https://codigoparallevar.com/implicit.\n",
+                        ),
+                    ],
+                ),
             ),
         )
 

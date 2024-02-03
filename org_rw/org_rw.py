@@ -94,6 +94,8 @@ LIST_ITEM_RE = re.compile(
     r"(?P<indentation>\s*)((?P<bullet>[*\-+])|((?P<counter>\d|[a-zA-Z])(?P<counter_sep>[.)]))) ((?P<checkbox_indentation>\s*)\[(?P<checkbox_value>[ Xx])\])?((?P<tag_indentation>\s*)(?P<tag>.*?)::)?(?P<content>.*)"
 )
 
+IMPLICIT_LINK_RE = re.compile(r'(https?:[^<> ]*[a-zA-Z])')
+
 # Org-Babel
 BEGIN_BLOCK_RE = re.compile(r"^\s*#\+BEGIN_(?P<subtype>[^ ]+)(?P<arguments>.*)$", re.I)
 END_BLOCK_RE = re.compile(r"^\s*#\+END_(?P<subtype>[^ ]+)\s*$", re.I)
@@ -206,6 +208,14 @@ def get_links_from_content(content):
                 link_description.append(tok)
             else:
                 link_value.append(tok)
+        elif isinstance(tok, str):
+            implicit_links = IMPLICIT_LINK_RE.findall(tok)
+            for link in implicit_links:
+                yield Link(
+                    cast(str, link),
+                    cast(str, link),
+                    None
+                )
 
 def text_to_dom(tokens, item):
     if tokens is None:
@@ -1297,7 +1307,7 @@ class Line:
 
 
 class Link:
-    def __init__(self, value: str, description: Optional[str], origin: RangeInRaw):
+    def __init__(self, value: str, description: Optional[str], origin: Optional[RangeInRaw]):
         self._value = value
         self._description = description
         self._origin = origin
