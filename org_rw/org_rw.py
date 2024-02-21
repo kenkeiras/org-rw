@@ -94,7 +94,7 @@ LIST_ITEM_RE = re.compile(
     r"(?P<indentation>\s*)((?P<bullet>[*\-+])|((?P<counter>\d|[a-zA-Z])(?P<counter_sep>[.)]))) ((?P<checkbox_indentation>\s*)\[(?P<checkbox_value>[ Xx])\])?((?P<tag_indentation>\s*)(?P<tag>.*?)::)?(?P<content>.*)"
 )
 
-IMPLICIT_LINK_RE = re.compile(r'(https?:[^<> ]*[a-zA-Z])')
+IMPLICIT_LINK_RE = re.compile(r'(https?:[^<> ]*[a-zA-Z0-9])')
 
 # Org-Babel
 BEGIN_BLOCK_RE = re.compile(r"^\s*#\+BEGIN_(?P<subtype>[^ ]+)(?P<arguments>.*)$", re.I)
