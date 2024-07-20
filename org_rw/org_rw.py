@@ -1871,7 +1871,7 @@ class OrgDoc:
 
         for keyword in keywords:
             if keyword.key in ("TODO", "SEQ_TODO"):
-                todo_kws, done_kws = re.sub(r"\(.\)", "", keyword.value).split("|", 1)
+                todo_kws, done_kws = re.sub(r"\([^)]+\)", "", keyword.value).split("|", 1)
 
                 self.todo_keywords = re.sub(r"\s{2,}", " ", todo_kws.strip()).split()
                 self.done_keywords = re.sub(r"\s{2,}", " ", done_kws.strip()).split()
