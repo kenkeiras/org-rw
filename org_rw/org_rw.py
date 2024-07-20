@@ -302,6 +302,9 @@ class Headline:
         is_todo: bool,
         is_done: bool,
         spacing,
+        scheduled: Optional[Time] = None,
+        deadline: Optional[Time] = None,
+        closed: Optional[Time] = None,
     ):
         self.start_line = start_line
         self.depth = depth
@@ -324,9 +327,9 @@ class Headline:
         self.parent = parent
         self.is_todo = is_todo
         self.is_done = is_done
-        self.scheduled: Time = None
-        self.deadline: Time = None
-        self.closed: Time = None
+        self.scheduled = scheduled
+        self.deadline = deadline
+        self.closed = closed
         self.spacing = spacing
 
         # Read planning line
@@ -712,7 +715,7 @@ class Headline:
 
                 time_seg = content[len("CLOCK:") :].strip()
 
-                parsed: Time = None
+                parsed: Optional[Time] = None
                 if "--" in time_seg:
                     # TODO: Consider duration
                     start, end = time_seg.split("=")[0].split("--")
@@ -1522,10 +1525,10 @@ def timestamp_to_string(ts: Timestamp, end_time: Optional[Timestamp] = None) -> 
         return "[{}]".format(base)
 
 
-Time = Union[None, TimeRange, OrgTime]
+Time = Union[TimeRange, OrgTime]
 
 
-def parse_time(value: str) -> Time:
+def parse_time(value: str) -> Optional[Time]:
     if (value.count(">--<") == 1) or (value.count("]--[") == 1):
         # Time ranges with two different dates
         # @TODO properly consider "=> DURATION" section
@@ -2151,7 +2154,9 @@ class OrgDoc:
 
         for keyword in keywords:
             if keyword.key in ("TODO", "SEQ_TODO"):
-                todo_kws, done_kws = re.sub(r"\([^)]+\)", "", keyword.value).split("|", 1)
+                todo_kws, done_kws = re.sub(r"\([^)]+\)", "", keyword.value).split(
+                    "|", 1
+                )
 
                 self.todo_keywords = re.sub(r"\s{2,}", " ", todo_kws.strip()).split()
                 self.done_keywords = re.sub(r"\s{2,}", " ", done_kws.strip()).split()
