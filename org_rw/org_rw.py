@@ -1033,34 +1033,47 @@ class Timestamp:
     def __init__(
         self,
         active: bool,
-        year: int,
-        month: int,
-        day: int,
-        dow: Optional[str],
-        hour: Optional[int],
-        minute: Optional[int],
+        year: Optional[int] = None,
+        month: Optional[int] = None,
+        day: Optional[int] = None,
+        dow: Optional[str] = None,
+        hour: Optional[int] = None,
+        minute: Optional[int] = None,
         repetition: Optional[str] = None,
+        datetime_: Optional[Union[date, datetime]] = None,
     ):
         """
         Initializes a Timestamp instance.
 
         Args:
             active (bool): Whether the timestamp is active.
-            year (int): The year of the timestamp.
-            month (int): The month of the timestamp.
-            day (int): The day of the timestamp.
+            year (Optional[int]): The year of the timestamp.
+            month (Optional[int]): The month of the timestamp.
+            day (Optional[int]): The day of the timestamp.
             dow (Optional[str]): The day of the week, if any.
             hour (Optional[int]): The hour of the timestamp, if any.
             minute (Optional[int]): The minute of the timestamp, if any.
             repetition (Optional[str]): The repetition pattern, if any.
+            datetime_ (Optional[Union[date, datetime]]): A date or datetime object.
+
+        Raises:
+            ValueError: If neither datetime_ nor the combination of year, month, and day are provided.
         """
         self.active = active
-        self._year = year
-        self._month = month
-        self._day = day
-        self.dow = dow
-        self.hour = hour
-        self.minute = minute
+
+        if datetime_ is not None:
+            self.from_datetime(datetime_)
+        elif year is not None and month is not None and day is not None:
+            self._year = year
+            self._month = month
+            self._day = day
+            self.dow = dow
+            self.hour = hour
+            self.minute = minute
+        else:
+            raise ValueError(
+                "Either datetime_ or year, month, and day must be provided."
+            )
         self.repetition = repetition
 
     def to_datetime(self) -> datetime:
@@ -1475,16 +1488,16 @@ class OrgTime:
         """
         self.time.active = False
 
-    def set_datetime(self, dt: datetime) -> None:
+    def from_datetime(self, dt: datetime) -> None:
         """
         Updates the timestamp to use the given datetime.
 
         Args:
             dt (datetime): The datetime to update the timestamp with.
         """
-        self.time = Timestamp.from_datetime(dt)
+        self.time.from_datetime(dt)
         if self.end_time:
-            self.end_time = Timestamp.from_datetime(dt)
+            self.end_time.from_datetime(dt)
 
 
 def time_from_str(s: str) -> Optional[OrgTime]:
