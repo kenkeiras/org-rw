@@ -1032,7 +1032,7 @@ TableRow = collections.namedtuple(
 class Timestamp:
     def __init__(
         self,
-        active: bool,
+        active: bool = True,
         year: Optional[int] = None,
         month: Optional[int] = None,
         day: Optional[int] = None,
