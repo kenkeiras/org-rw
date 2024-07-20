@@ -9,7 +9,7 @@ import re
 import sys
 from datetime import date, datetime, timedelta
 from enum import Enum
-from typing import cast, Iterator, List, Literal, Optional, Tuple, Union
+from typing import cast, Iterator, List, Literal, Optional, Tuple, TypedDict, Union
 
 from .types import HeadlineDict
 
@@ -106,6 +106,15 @@ CodeSnippet = collections.namedtuple("CodeSnippet", ("name", "content", "result"
 # Groupings
 NON_FINISHED_GROUPS = (type(None), dom.ListGroupNode, dom.ResultsDrawerNode, dom.PropertyDrawerNode)
 FREE_GROUPS = (dom.CodeBlock,)
+
+# States
+class HeadlineState(TypedDict):
+    # To be extended to handle keyboard shortcuts
+    name: str
+
+class OrgDocDeclaredStates(TypedDict):
+    not_completed: List[HeadlineState]
+    completed: List[HeadlineState]
 
 
 class NonReproducibleDocument(Exception):
@@ -1759,16 +1768,16 @@ def parse_headline(hl, doc, parent) -> Headline:
     title = line
     is_done = is_todo = False
     for state in doc.todo_keywords or []:
-        if title.startswith(state + " "):
+        if title.startswith(state['name'] + " "):
             hl_state = state
-            title = title[len(state + " ") :]
+            title = title[len(state['name'] + " ") :]
             is_todo = True
             break
     else:
         for state in doc.done_keywords or []:
-            if title.startswith(state + " "):
+            if title.startswith(state['name'] + " "):
                 hl_state = state
-                title = title[len(state + " ") :]
+                title = title[len(state['name'] + " ") :]
                 is_done = True
                 break
 
@@ -1863,29 +1872,53 @@ def dump_delimiters(line: DelimiterLine):
     return (line.linenum, line.line)
 
 
+def parse_todo_done_keywords(line: str) -> OrgDocDeclaredStates:
+    clean_line = re.sub(r"\([^)]+\)", "", line)
+    if '|' in clean_line:
+        todo_kws, done_kws = clean_line.split("|", 1)
+        has_split = True
+    else:
+        # Standard behavior in this case is: the last state is the one considered as DONE
+        todo_kws = clean_line
+
+    todo_keywords = re.sub(r"\s{2,}", " ", todo_kws.strip()).split()
+    if has_split:
+        done_keywords = re.sub(r"\s{2,}", " ", done_kws.strip()).split()
+    else:
+        done_keywods = [todo_keywords[-1]]
+        todo_keywords = todo_keywords[:-1]
+
+    return {
+        "not_completed": [
+            HeadlineState(name=keyword)
+            for keyword in todo_keywords
+        ],
+        "completed": [
+            HeadlineState(name=keyword)
+            for keyword in done_keywords
+        ],
+    }
+
+
 class OrgDoc:
     def __init__(
         self, headlines, keywords, contents, list_items, structural, properties,
         environment=BASE_ENVIRONMENT,
     ):
-        self.todo_keywords = DEFAULT_TODO_KEYWORDS
-        self.done_keywords = DEFAULT_DONE_KEYWORDS
+        self.todo_keywords = [HeadlineState(name=kw) for kw in DEFAULT_TODO_KEYWORDS]
+        self.done_keywords = [HeadlineState(name=kw) for kw in DEFAULT_DONE_KEYWORDS]
 
         keywords_set_in_file = False
         for keyword in keywords:
             if keyword.key in ("TODO", "SEQ_TODO"):
-                todo_kws, done_kws = re.sub(r"\([^)]+\)", "", keyword.value).split("|", 1)
-
-                self.todo_keywords = re.sub(r"\s{2,}", " ", todo_kws.strip()).split()
-                self.done_keywords = re.sub(r"\s{2,}", " ", done_kws.strip()).split()
+                states = parse_todo_done_keywords(keyword.value)
+                self.todo_keywords, self.done_keywords = states['not_completed'], states['completed']
                 keywords_set_in_file = True
 
         if not keywords_set_in_file and 'org-todo-keywords' in environment:
             # Read keywords from environment
-            todo_kws, done_kws = re.sub(r"\([^)]+\)", "", environment['org-todo-keywords']).split("|", 1)
-
-            self.todo_keywords = re.sub(r"\s{2,}", " ", todo_kws.strip()).split()
-            self.done_keywords = re.sub(r"\s{2,}", " ", done_kws.strip()).split()
+            states = parse_todo_done_keywords(environment['org-todo-keywords'])
+            self.todo_keywords, self.done_keywords = states['not_completed'], states['completed']
 
         self.keywords: List[Property] = keywords
         self.contents: List[RawLine] = contents
@@ -1960,7 +1993,7 @@ class OrgDoc:
 
         state = ""
         if headline.state:
-            state = headline.state + " "
+            state = headline.state['name'] + " "
 
         raw_title = token_list_to_raw(headline.title.contents)
         tags_padding = ""
