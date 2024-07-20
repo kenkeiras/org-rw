@@ -809,6 +809,23 @@ class TestSerde(unittest.TestCase):
 
         self.assertEqual(dumps(doc), orig)
 
+    def test_add_todo_keywords_in_file(self):
+        orig = '''#+TODO: NEW_TODO_STATE | NEW_DONE_STATE
+
+* NEW_TODO_STATE First entry
+
+* NEW_DONE_STATE Second entry'''
+        doc = loads(orig, environment={
+            'org-todo-keywords': "NEW_TODO_STATE | NEW_DONE_STATE"
+        })
+        self.assertEqual(doc.headlines[0].is_todo, True)
+        self.assertEqual(doc.headlines[0].is_done, False)
+
+        self.assertEqual(doc.headlines[1].is_todo, False)
+        self.assertEqual(doc.headlines[1].is_done, True)
+
+        self.assertEqual(dumps(doc), orig)
+
 
 def print_tree(tree, indentation=0, headline=None):
     for element in tree:
