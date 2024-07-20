@@ -17,8 +17,12 @@ from . import dom
 
 DEBUG_DIFF_CONTEXT = 10
 
+DEFAULT_TODO_KEYWORDS = ["TODO"]
+DEFAULT_DONE_KEYWORDS = ["DONE"]
+
 BASE_ENVIRONMENT = {
     "org-footnote-section": "Footnotes",
+    "org-todo-keywords": ' '.join(DEFAULT_TODO_KEYWORDS) + ' | ' + ' '.join(DEFAULT_DONE_KEYWORDS),
     "org-options-keywords": (
         "ARCHIVE:",
         "AUTHOR:",
@@ -51,9 +55,6 @@ BASE_ENVIRONMENT = {
         "EXCLUDE_TAGS:",
     ),
 }
-
-DEFAULT_TODO_KEYWORDS = ["TODO"]
-DEFAULT_DONE_KEYWORDS = ["DONE"]
 
 HEADLINE_TAGS_RE = re.compile(r"((:(\w|[0-9_@#%])+)+:)\s*$")
 HEADLINE_RE = re.compile(r"^(?P<stars>\*+)(?P<spacing>\s+)(?P<line>.*?)$")
@@ -1864,17 +1865,27 @@ def dump_delimiters(line: DelimiterLine):
 
 class OrgDoc:
     def __init__(
-        self, headlines, keywords, contents, list_items, structural, properties
+        self, headlines, keywords, contents, list_items, structural, properties,
+        environment=BASE_ENVIRONMENT,
     ):
         self.todo_keywords = DEFAULT_TODO_KEYWORDS
         self.done_keywords = DEFAULT_DONE_KEYWORDS
 
+        keywords_set_in_file = False
         for keyword in keywords:
             if keyword.key in ("TODO", "SEQ_TODO"):
                 todo_kws, done_kws = re.sub(r"\([^)]+\)", "", keyword.value).split("|", 1)
 
                 self.todo_keywords = re.sub(r"\s{2,}", " ", todo_kws.strip()).split()
                 self.done_keywords = re.sub(r"\s{2,}", " ", done_kws.strip()).split()
+                keywords_set_in_file = True
+
+        if not keywords_set_in_file and 'org-todo-keywords' in environment:
+            # Read keywords from environment
+            todo_kws, done_kws = re.sub(r"\([^)]+\)", "", environment['org-todo-keywords']).split("|", 1)
+
+            self.todo_keywords = re.sub(r"\s{2,}", " ", todo_kws.strip()).split()
+            self.done_keywords = re.sub(r"\s{2,}", " ", done_kws.strip()).split()
 
         self.keywords: List[Property] = keywords
         self.contents: List[RawLine] = contents
@@ -2050,7 +2061,7 @@ class OrgDoc:
 
 
 class OrgDocReader:
-    def __init__(self):
+    def __init__(self, environment=BASE_ENVIRONMENT):
         self.headlines: List[HeadlineDict] = []
         self.keywords: List[Keyword] = []
         self.headline_hierarchy: List[Optional[HeadlineDict]] = []
@@ -2061,6 +2072,7 @@ class OrgDocReader:
         self.structural: List = []
         self.properties: List = []
         self.current_drawer: Optional[List] = None
+        self.environment = environment
 
     def finalize(self):
         return OrgDoc(
@@ -2070,6 +2082,7 @@ class OrgDocReader:
             self.list_items,
             self.structural,
             self.properties,
+            self.environment,
         )
 
     ## Construction
@@ -2258,7 +2271,7 @@ class OrgDocReader:
 
         self.current_drawer.append(Property(linenum, match, key, value, None))
 
-    def read(self, s, environment):
+    def read(self, s):
         lines = s.split("\n")
         line_count = len(lines)
         reader = enumerate(lines)
@@ -2349,8 +2362,8 @@ class OrgDocReader:
 
 
 def loads(s, environment=BASE_ENVIRONMENT, extra_cautious=True):
-    reader = OrgDocReader()
-    reader.read(s, environment)
+    reader = OrgDocReader(environment)
+    reader.read(s)
     doc = reader.finalize()
     if extra_cautious:  # Check that all options can be properly re-serialized
         after_dump = dumps(doc)
