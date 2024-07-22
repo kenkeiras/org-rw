@@ -772,6 +772,20 @@ class Headline:
         else:
             raise NotImplementedError()
 
+    def update_raw_contents(self, new_contents):
+        # @TODO: Properly re-parse elements
+        self.keywords = []
+        self.contents = []
+        self.list_items = []
+        self.table_rows = []
+        self.properties = []
+        self.structural = []
+        self.delimiters = []
+        for line in new_contents.split('\n'):
+            self.contents.append(
+                RawLine(linenum=0, line=line)
+            )
+
     def get_element_in_line(self, linenum):
         for line in self.contents:
             if linenum == line.linenum:
