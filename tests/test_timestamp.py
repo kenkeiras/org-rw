@@ -44,7 +44,7 @@ def test_init_with_year_month_day() -> None:
         hour=15,
         minute=45,
         dow="Saturday",
-        repetition="Weekly",
+        repetition=".+1d",
     )
 
     assert ts.active is True
@@ -54,7 +54,7 @@ def test_init_with_year_month_day() -> None:
     assert ts.hour == 15
     assert ts.minute == 45
     assert ts.dow == "Saturday"
-    assert ts.repetition == "Weekly"
+    assert ts.repetition == ".+1d"
 
 
 def test_init_without_required_arguments() -> None:
