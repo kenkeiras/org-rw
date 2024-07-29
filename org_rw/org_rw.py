@@ -829,6 +829,10 @@ class Headline:
         self.properties = []
         self.structural = []
         self.delimiters = []
+        self.scheduled = None
+        self.deadline = None
+        self.closed = None
+
         for line in new_contents.split('\n'):
             self.contents.append(
                 RawLine(linenum=0, line=line)
