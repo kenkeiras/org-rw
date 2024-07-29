@@ -1,6 +1,7 @@
 import re
 from typing import List, TypedDict
 
+
 class HeadlineDict(TypedDict):
     linenum: int
     orig: re.Match
