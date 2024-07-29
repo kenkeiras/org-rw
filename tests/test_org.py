@@ -1,14 +1,23 @@
-import logging
 import os
 import unittest
-from datetime import date
 from datetime import datetime as DT
 
 from org_rw import MarkerToken, MarkerType, Timestamp, dumps, load, loads, dom
 import org_rw
 
-from utils.assertions import (BOLD, CODE, HL, ITALIC, SPAN, STRIKE, UNDERLINED,
-                              VERBATIM, WEB_LINK, Doc, Tokens)
+from utils.assertions import (
+    BOLD,
+    CODE,
+    HL,
+    ITALIC,
+    SPAN,
+    STRIKE,
+    UNDERLINED,
+    VERBATIM,
+    WEB_LINK,
+    Doc,
+    Tokens,
+)
 
 DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -283,13 +292,19 @@ class TestSerde(unittest.TestCase):
                         SPAN("\n"),
                         SPAN(
                             "  This is a ",
-                            WEB_LINK("[tricky web link]\u200b", "https://codigoparallevar.com/4"),
+                            WEB_LINK(
+                                "[tricky web link]\u200b",
+                                "https://codigoparallevar.com/4",
+                            ),
                             " followed up with some text.\n",
                         ),
                         SPAN("\n"),
                         SPAN(
                             "  This is [",
-                            WEB_LINK("another tricky web link", "https://codigoparallevar.com/5"),
+                            WEB_LINK(
+                                "another tricky web link",
+                                "https://codigoparallevar.com/5",
+                            ),
                             "] followed up with some text.\n",
                         ),
                     ],
@@ -306,7 +321,7 @@ class TestSerde(unittest.TestCase):
                         ),
                     ],
                 ),
-            )
+            ),
         )
 
         ex.assert_matches(self, doc)
@@ -471,7 +486,9 @@ class TestSerde(unittest.TestCase):
             + 'echo "with two lines"\n'
             + "exit 0 # Exit successfully",
         )
-        self.assertEqual(snippets[0].arguments.split(), ['shell', ':results', 'verbatim'])
+        self.assertEqual(
+            snippets[0].arguments.split(), ["shell", ":results", "verbatim"]
+        )
         self.assertEqual(
             snippets[0].result,
             "This is a test\n" + "with two lines",
@@ -489,10 +506,10 @@ class TestSerde(unittest.TestCase):
 
         self.assertEqual(
             snippets[2].content,
-            '/* This code has to be escaped to\n'
-            + ' * avoid confusion with new headlines.\n'
-            + ' */\n'
-            + 'main(){}',
+            "/* This code has to be escaped to\n"
+            + " * avoid confusion with new headlines.\n"
+            + " */\n"
+            + "main(){}",
         )
 
     def test_mimic_write_file_05(self):
@@ -530,7 +547,7 @@ class TestSerde(unittest.TestCase):
         hl_schedule_range = hl.children[1]
         self.assertEqual(
             hl_schedule_range.scheduled.time,
-            Timestamp(True, 2020, 12, 15, "Mar", 0, 5, '++1w')
+            Timestamp(True, 2020, 12, 15, "Mar", 0, 5, "++1w"),
         )
         self.assertEqual(
             hl_schedule_range.scheduled.end_time,
@@ -538,7 +555,7 @@ class TestSerde(unittest.TestCase):
         )
         self.assertEqual(
             hl_schedule_range.scheduled.repetition,
-            '++1w',
+            "++1w",
         )
 
     def test_update_info_file_05(self):
@@ -591,7 +608,8 @@ class TestSerde(unittest.TestCase):
                 MarkerToken(closing=False, tok_type=MarkerType.UNDERLINED_MODE),
                 "markup",
                 MarkerToken(closing=True, tok_type=MarkerType.UNDERLINED_MODE),
-                ".", "\n"
+                ".",
+                "\n",
             ],
         )
 
@@ -625,12 +643,24 @@ class TestSerde(unittest.TestCase):
         print(lists4)
         self.assertEqual(len(lists4), 2)
 
-        self.assertEqual(lists4[0][0].content, ["This is a list item...", "\n    that spans multiple lines", "\n"])
+        self.assertEqual(
+            lists4[0][0].content,
+            ["This is a list item...", "\n    that spans multiple lines", "\n"],
+        )
         self.assertEqual(lists4[0][0].bullet, "-")
-        self.assertEqual(lists4[0][1].content, ["This is another list item...", "\n    that has content on multiple lines", "\n"])
+        self.assertEqual(
+            lists4[0][1].content,
+            [
+                "This is another list item...",
+                "\n    that has content on multiple lines",
+                "\n",
+            ],
+        )
         self.assertEqual(lists4[0][1].bullet, "-")
 
-        self.assertEqual(lists4[1][0].content, ["This is another", "\n    multiline list", "\n"])
+        self.assertEqual(
+            lists4[1][0].content, ["This is another", "\n    multiline list", "\n"]
+        )
         self.assertEqual(lists4[1][0].bullet, "-")
 
     def test_org_roam_07(self):
@@ -674,20 +704,22 @@ class TestSerde(unittest.TestCase):
             """.strip(),
         )
 
-
     def test_markup_file_09(self):
         with open(os.path.join(DIR, "09-markup-on-headline.org")) as f:
             doc = load(f)
 
         hl = doc.getTopHeadlines()[0]
         print(hl.title)
-        self.assertEqual(hl.title.contents, [
-            'Headline ',
-            MarkerToken(closing=False, tok_type=MarkerType.UNDERLINED_MODE),
-            'with',
-            MarkerToken(closing=True, tok_type=MarkerType.UNDERLINED_MODE),
-            ' markup',
-        ])
+        self.assertEqual(
+            hl.title.contents,
+            [
+                "Headline ",
+                MarkerToken(closing=False, tok_type=MarkerType.UNDERLINED_MODE),
+                "with",
+                MarkerToken(closing=True, tok_type=MarkerType.UNDERLINED_MODE),
+                " markup",
+            ],
+        )
 
     def test_mimic_write_file_10(self):
         with open(os.path.join(DIR, "10-tables.org")) as f:
@@ -708,9 +740,9 @@ class TestSerde(unittest.TestCase):
 
         print(first_table[0])
         self.assertEqual(len(first_table[0].cells), 3)
-        self.assertEqual(first_table[0].cells[0].strip(), 'Header1')
-        self.assertEqual(first_table[0].cells[1].strip(), 'Header2')
-        self.assertEqual(first_table[0].cells[2].strip(), 'Header3')
+        self.assertEqual(first_table[0].cells[0].strip(), "Header1")
+        self.assertEqual(first_table[0].cells[1].strip(), "Header2")
+        self.assertEqual(first_table[0].cells[2].strip(), "Header3")
 
         hl = hl.children[0]
 
@@ -720,9 +752,9 @@ class TestSerde(unittest.TestCase):
 
         print(first_table[0])
         self.assertEqual(len(first_table[0].cells), 3)
-        self.assertEqual(first_table[0].cells[0].strip(), 'Header1')
-        self.assertEqual(first_table[0].cells[1].strip(), 'Header2')
-        self.assertEqual(first_table[0].cells[2].strip(), 'Header3')
+        self.assertEqual(first_table[0].cells[0].strip(), "Header1")
+        self.assertEqual(first_table[0].cells[1].strip(), "Header2")
+        self.assertEqual(first_table[0].cells[2].strip(), "Header3")
 
     def test_tables_html_file_10(self):
         with open(os.path.join(DIR, "10-tables.org")) as f:
@@ -732,27 +764,26 @@ class TestSerde(unittest.TestCase):
 
         tree = hl.as_dom()
         non_props = [
-            item
-            for item in tree
-            if not isinstance(item, dom.PropertyDrawerNode)
+            item for item in tree if not isinstance(item, dom.PropertyDrawerNode)
         ]
-        self.assertTrue(isinstance(non_props[0], dom.Text)
-                        and isinstance(non_props[1], dom.TableNode)
-                        and isinstance(non_props[2], dom.Text),
-                        'Expected <Text><Table><Text>')
-
+        self.assertTrue(
+            isinstance(non_props[0], dom.Text)
+            and isinstance(non_props[1], dom.TableNode)
+            and isinstance(non_props[2], dom.Text),
+            "Expected <Text><Table><Text>",
+        )
 
         hl = hl.children[0]
         tree = hl.as_dom()
         non_props = [
             item
             for item in tree
-            if not (isinstance(item, dom.PropertyDrawerNode)
-                    or isinstance(item, dom.Text))
+            if not (
+                isinstance(item, dom.PropertyDrawerNode) or isinstance(item, dom.Text)
+            )
         ]
         print_tree(non_props)
-        self.assertTrue(len(non_props) == 1,
-                        'Expected <List>, with only (1) element')
+        self.assertTrue(len(non_props) == 1, "Expected <List>, with only (1) element")
 
     def test_nested_lists_html_file_11(self):
         with open(os.path.join(DIR, "11-nested-lists.org")) as f:
@@ -762,30 +793,38 @@ class TestSerde(unittest.TestCase):
 
         tree = hl.as_dom()
         non_props = [
-            item
-            for item in tree
-            if not isinstance(item, dom.PropertyDrawerNode)
+            item for item in tree if not isinstance(item, dom.PropertyDrawerNode)
         ]
         print_tree(non_props)
-        self.assertTrue((len(non_props) == 1) and (isinstance(non_props[0], dom.ListGroupNode)),
-                        'Expected only <List> as top level')
+        self.assertTrue(
+            (len(non_props) == 1) and (isinstance(non_props[0], dom.ListGroupNode)),
+            "Expected only <List> as top level",
+        )
 
         dom_list = non_props[0]
         children = dom_list.children
-        self.assertTrue(len(children) == 5, 'Expected 5 items inside <List>, 3 texts and 2 sublists')
+        self.assertTrue(
+            len(children) == 5, "Expected 5 items inside <List>, 3 texts and 2 sublists"
+        )
 
         # Assert texts
-        self.assertEqual(children[0].content, ['1'])
-        self.assertEqual(children[2].content, ['2'])
-        self.assertEqual(children[4].content[0], '3')  # Might be ['3', '\n'] but shouldn't be a breaking change
+        self.assertEqual(children[0].content, ["1"])
+        self.assertEqual(children[2].content, ["2"])
+        self.assertEqual(
+            children[4].content[0], "3"
+        )  # Might be ['3', '\n'] but shouldn't be a breaking change
 
         # Assert lists
-        self.assertTrue(isinstance(children[1], dom.ListGroupNode), 'Expected sublist inside "1"')
-        self.assertEqual(children[1].children[0].content, ['1.1'])
-        self.assertEqual(children[1].children[1].content, ['1.2'])
-        self.assertTrue(isinstance(children[3], dom.ListGroupNode), 'Expected sublist inside "2"')
-        self.assertEqual(children[3].children[0].content, ['2.1'])
-        self.assertEqual(children[3].children[1].content, ['2.2'])
+        self.assertTrue(
+            isinstance(children[1], dom.ListGroupNode), 'Expected sublist inside "1"'
+        )
+        self.assertEqual(children[1].children[0].content, ["1.1"])
+        self.assertEqual(children[1].children[1].content, ["1.2"])
+        self.assertTrue(
+            isinstance(children[3], dom.ListGroupNode), 'Expected sublist inside "2"'
+        )
+        self.assertEqual(children[3].children[0].content, ["2.1"])
+        self.assertEqual(children[3].children[1].content, ["2.2"])
 
     def test_mimic_write_file_12(self):
         with open(os.path.join(DIR, "12-headlines-with-skip-levels.org")) as f:
@@ -844,6 +883,10 @@ def print_element(element, indentation, headline):
     if isinstance(element, org_rw.Link):
         print(" " * indentation * 2, "Link:", element.get_raw())
     elif isinstance(element, str):
-        print(" " * indentation * 2, "Str[" + element.replace('\n', '<NL>') + "]", type(element))
+        print(
+            " " * indentation * 2,
+            "Str[" + element.replace("\n", "<NL>") + "]",
+            type(element),
+        )
     else:
         print_tree(element, indentation, headline)

@@ -1,7 +1,7 @@
 from __future__ import annotations
-
+from typing import Optional
+from datetime import timedelta
 import collections
-from ctypes import ArgumentError
 import difflib
 import logging
 import os
@@ -14,6 +14,7 @@ from typing import cast, Iterator, List, Literal, Optional, Tuple, TypedDict, Un
 from .types import HeadlineDict
 
 from . import dom
+
 
 DEBUG_DIFF_CONTEXT = 10
 
@@ -95,16 +96,23 @@ LIST_ITEM_RE = re.compile(
     r"(?P<indentation>\s*)((?P<bullet>[*\-+])|((?P<counter>\d|[a-zA-Z])(?P<counter_sep>[.)]))) ((?P<checkbox_indentation>\s*)\[(?P<checkbox_value>[ Xx])\])?((?P<tag_indentation>\s*)(?P<tag>.*?)::)?(?P<content>.*)"
 )
 
-IMPLICIT_LINK_RE = re.compile(r'(https?:[^<> ]*[a-zA-Z0-9])')
+IMPLICIT_LINK_RE = re.compile(r"(https?:[^<> ]*[a-zA-Z0-9])")
 
 # Org-Babel
 BEGIN_BLOCK_RE = re.compile(r"^\s*#\+BEGIN_(?P<subtype>[^ ]+)(?P<arguments>.*)$", re.I)
 END_BLOCK_RE = re.compile(r"^\s*#\+END_(?P<subtype>[^ ]+)\s*$", re.I)
 RESULTS_DRAWER_RE = re.compile(r"^\s*:results:\s*$", re.I)
-CodeSnippet = collections.namedtuple("CodeSnippet", ("name", "content", "result", "arguments"))
+CodeSnippet = collections.namedtuple(
+    "CodeSnippet", ("name", "content", "result", "arguments")
+)
 
 # Groupings
-NON_FINISHED_GROUPS = (type(None), dom.ListGroupNode, dom.ResultsDrawerNode, dom.PropertyDrawerNode)
+NON_FINISHED_GROUPS = (
+    type(None),
+    dom.ListGroupNode,
+    dom.ResultsDrawerNode,
+    dom.PropertyDrawerNode,
+)
 FREE_GROUPS = (dom.CodeBlock,)
 
 # States
@@ -122,6 +130,7 @@ class NonReproducibleDocument(Exception):
     Exception thrown when a document would be saved as different contents
     from what it's loaded from.
     """
+
     pass
 
 
@@ -174,20 +183,19 @@ def unescape_block_lines(block: str) -> str:
     Remove leading ',' from block_lines if they escape `*` characters.
     """
     i = 0
-    lines = block.split('\n')
+    lines = block.split("\n")
     while i < len(lines):
         line = lines[i]
-        if (line.lstrip(' ').startswith(',')
-            and line.lstrip(' ,').startswith('*')
-        ):
+        if line.lstrip(" ").startswith(",") and line.lstrip(" ,").startswith("*"):
             # Remove leading ','
-            lead_pos = line.index(',')
-            line = line[:lead_pos] + line[lead_pos + 1:]
+            lead_pos = line.index(",")
+            line = line[:lead_pos] + line[lead_pos + 1 :]
             lines[i] = line
 
         i += 1
 
-    return '\n'.join(lines)
+    return "\n".join(lines)
+
 
 def get_links_from_content(content):
     in_link = False
@@ -221,11 +229,8 @@ def get_links_from_content(content):
         elif isinstance(tok, str):
             implicit_links = IMPLICIT_LINK_RE.findall(tok)
             for link in implicit_links:
-                yield Link(
-                    cast(str, link),
-                    cast(str, link),
-                    None
-                )
+                yield Link(cast(str, link), cast(str, link), None)
+
 
 def text_to_dom(tokens, item):
     if tokens is None:
@@ -247,11 +252,13 @@ def text_to_dom(tokens, item):
                 in_description = True
             elif tok.tok_type == LinkTokenType.CLOSE:
                 rng = RangeInRaw(item, open_link_token, tok)
-                contents.append(Link(
-                    "".join(link_value),
-                    "".join(link_description) if in_description else None,
-                    rng,
-                ))
+                contents.append(
+                    Link(
+                        "".join(link_value),
+                        "".join(link_description) if in_description else None,
+                        rng,
+                    )
+                )
                 in_link = False
                 in_description = False
                 link_value = []
@@ -265,6 +272,7 @@ def text_to_dom(tokens, item):
             contents.append(tok)
 
     return contents
+
 
 def get_line(item):
     if isinstance(item, Text):
@@ -301,9 +309,12 @@ class Headline:
         list_items,
         table_rows,
         parent,
-        is_todo,
-        is_done,
+        is_todo: bool,
+        is_done: bool,
         spacing,
+        scheduled: Optional[Time] = None,
+        deadline: Optional[Time] = None,
+        closed: Optional[Time] = None,
     ):
         self.start_line = start_line
         self.depth = depth
@@ -313,9 +324,7 @@ class Headline:
         self.priority_start = priority_start
         self.priority = priority
         self.title_start = title_start
-        self.title = parse_content_block(
-            [RawLine(linenum=start_line, line=title)]
-        )
+        self.title = parse_content_block([RawLine(linenum=start_line, line=title)])
         self.state = state
         self.tags_start = tags_start
         self.shallow_tags = tags
@@ -328,9 +337,9 @@ class Headline:
         self.parent = parent
         self.is_todo = is_todo
         self.is_done = is_done
-        self.scheduled = None
-        self.deadline = None
-        self.closed = None
+        self.scheduled = scheduled
+        self.deadline = deadline
+        self.closed = closed
         self.spacing = spacing
 
         # Read planning line
@@ -372,7 +381,6 @@ class Headline:
             par = par.parent
         return par
 
-
     def as_dom(self):
         everything = (
             self.keywords
@@ -410,7 +418,7 @@ class Headline:
                     tree.append(current_node)
                     current_node = None
                 else:
-                    pass # Ignore
+                    pass  # Ignore
 
             elif isinstance(line, Property):
                 if type(current_node) in NON_FINISHED_GROUPS:
@@ -423,22 +431,24 @@ class Headline:
                 tree_up = list(indentation_tree)
                 while len(tree_up) > 0:
                     node: dom.DomNode = tree_up[-1]
-                    if (isinstance(node, dom.BlockNode)
-                        or isinstance(node, dom.DrawerNode)
+                    if isinstance(node, dom.BlockNode) or isinstance(
+                        node, dom.DrawerNode
                     ):
                         node.append(dom.Text(line))
                         current_node = node
                         contents = None
                         break
-                    elif ((not isinstance(node, dom.TableNode)) and
-                          (type(node) not in NON_FINISHED_GROUPS)
+                    elif (not isinstance(node, dom.TableNode)) and (
+                        type(node) not in NON_FINISHED_GROUPS
                     ):
-                        raise NotImplementedError('Not implemented node type: {} (headline_id={}, line={}, doc={})'.format(
-                            node,
-                            self.id,
-                            line.linenum,
-                            self.doc.path,
-                        ))
+                        raise NotImplementedError(
+                            "Not implemented node type: {} (headline_id={}, line={}, doc={})".format(
+                                node,
+                                self.id,
+                                line.linenum,
+                                self.doc.path,
+                            )
+                        )
                     else:
                         tree_up.pop(-1)
                 else:
@@ -448,7 +458,8 @@ class Headline:
                 indentation_tree = tree_up
 
             elif isinstance(line, ListItem):
-                if (current_node is None
+                if (
+                    current_node is None
                     or isinstance(current_node, dom.TableNode)
                     or isinstance(current_node, dom.BlockNode)
                     or isinstance(current_node, dom.DrawerNode)
@@ -462,7 +473,14 @@ class Headline:
                     indentation_tree.append(current_node)
                 if not isinstance(current_node, dom.ListGroupNode):
                     if not isinstance(current_node, dom.ListGroupNode):
-                        raise Exception("Expected a {}, found: {} on line {} on {}".format(dom.ListGroupNode, current_node, line.linenum, self.doc.path))
+                        raise Exception(
+                            "Expected a {}, found: {} on line {} on {}".format(
+                                dom.ListGroupNode,
+                                current_node,
+                                line.linenum,
+                                self.doc.path,
+                            )
+                        )
                         # This can happen. Frequently inside a LogDrawer
 
                 if len(indentation_tree) > 0 and (
@@ -488,10 +506,9 @@ class Headline:
                         if isinstance(c, dom.ListItem)
                     ]
 
-                    if (len(list_children) == 0):
+                    if len(list_children) == 0:
                         break
-                    if ((len(list_children[-1].orig.indentation)
-                             <= len(line.indentation))):
+                    if len(list_children[-1].orig.indentation) <= len(line.indentation):
                         # No more breaking out of lists, it's indentation
                         # is less than ours
                         break
@@ -504,7 +521,11 @@ class Headline:
                     else:
                         current_node = indentation_tree[-1]
 
-                node = dom.ListItem(text_to_dom(line.tag, line), text_to_dom(line.content, line), orig=line)
+                node = dom.ListItem(
+                    text_to_dom(line.tag, line),
+                    text_to_dom(line.content, line),
+                    orig=line,
+                )
                 current_node.append(node)
 
             elif isinstance(line, TableRow):
@@ -521,10 +542,18 @@ class Headline:
                         list_node.append(current_node)
                         indentation_tree.append(current_node)
                     else:
-                        logging.debug("Expected a {}, found: {} on line {}".format(dom.TableNode, current_node, line.linenum))
+                        logging.debug(
+                            "Expected a {}, found: {} on line {}".format(
+                                dom.TableNode, current_node, line.linenum
+                            )
+                        )
                         # This can happen. Frequently inside a LogDrawer
 
-                if len(line.cells) > 0 and len(line.cells[0]) > 0 and line.cells[0][0] == '-':
+                if (
+                    len(line.cells) > 0
+                    and len(line.cells[0]) > 0
+                    and line.cells[0][0] == "-"
+                ):
                     node = dom.TableSeparatorRow(orig=line)
                 else:
                     node = dom.TableRow(line.cells, orig=line)
@@ -536,7 +565,9 @@ class Headline:
                 and line.delimiter_type == DelimiterLineType.BEGIN_BLOCK
             ):
                 assert type(current_node) in NON_FINISHED_GROUPS
-                current_node = dom.CodeBlock(line, line.type_data.subtype, line.arguments)
+                current_node = dom.CodeBlock(
+                    line, line.type_data.subtype, line.arguments
+                )
 
             elif isinstance(line, Keyword):
                 logging.warning("Keywords not implemented on `as_dom()`")
@@ -570,7 +601,7 @@ class Headline:
                     indentation_tree = [current_node]
                 elif content.strip().upper() == ":END:":
                     if current_node is None and len(indentation_tree) == 0:
-                        logging.error('Finished node (:END:) with no known starter')
+                        logging.error("Finished node (:END:) with no known starter")
                     else:
                         tree_up = list(indentation_tree)
                         while len(tree_up) > 0:
@@ -583,7 +614,11 @@ class Headline:
                             else:
                                 tree_up.pop(-1)
                         else:
-                            raise Exception('Unexpected node ({}) on headline (id={}), line {}'.format(current_node, self.id, linenum))
+                            raise Exception(
+                                "Unexpected node ({}) on headline (id={}), line {}".format(
+                                    current_node, self.id, linenum
+                                )
+                            )
                         current_node = None
                 elif content.strip().upper() == ":RESULTS:":
                     assert current_node is None
@@ -608,19 +643,22 @@ class Headline:
                 lists.append([li])
             else:
                 num_lines = li.linenum - (last_line + 1)
-                lines_between = ''.join(['\n' + l
-                                         for l in self.get_lines_between(last_line + 1, li.linenum)]
-                                        )
+                lines_between = "".join(
+                    [
+                        "\n" + l
+                        for l in self.get_lines_between(last_line + 1, li.linenum)
+                    ]
+                )
 
                 # Only empty lines
-                if ((num_lines == lines_between.count('\n'))
-                    and (len(lines_between.strip()) == 0)
+                if (num_lines == lines_between.count("\n")) and (
+                    len(lines_between.strip()) == 0
                 ):
                     lists[-1].append(li)
                 else:
                     lists.append([li])
 
-            last_line = li.linenum + sum(c.count('\n') for c in li.content)
+            last_line = li.linenum + sum(c.count("\n") for c in li.content)
         return lists
 
     # @DEPRECATED: use `get_lists`
@@ -687,7 +725,7 @@ class Headline:
 
                 time_seg = content[len("CLOCK:") :].strip()
 
-                parsed: Union[None, OrgTime, TimeRange] = None
+                parsed: Optional[Time] = None
                 if "--" in time_seg:
                     # TODO: Consider duration
                     start, end = time_seg.split("=")[0].split("--")
@@ -765,7 +803,7 @@ class Headline:
         for lst in self.get_lists():
             for item in lst:
                 if item.tag:
-                    yield from  get_links_from_content(item.tag)
+                    yield from get_links_from_content(item.tag)
                 yield from get_links_from_content(item.content)
 
     def get_lines_between(self, start, end):
@@ -787,7 +825,7 @@ class Headline:
             if linenum == line.linenum:
                 return line
 
-        for (s_lnum, struc) in self.structural:
+        for s_lnum, struc in self.structural:
             if linenum == s_lnum:
                 return ("structural", struc)
 
@@ -813,7 +851,7 @@ class Headline:
             )
 
     def get_structural_end_after(self, linenum):
-        for (s_lnum, struc) in self.structural:
+        for s_lnum, struc in self.structural:
             if s_lnum > linenum and struc.strip().upper() == ":END:":
                 return (s_lnum, struc)
 
@@ -824,11 +862,17 @@ class Headline:
         arguments = None
 
         for delimiter in self.delimiters:
-            if delimiter.delimiter_type == DelimiterLineType.BEGIN_BLOCK and delimiter.type_data.subtype.lower() == "src":
+            if (
+                delimiter.delimiter_type == DelimiterLineType.BEGIN_BLOCK
+                and delimiter.type_data.subtype.lower() == "src"
+            ):
                 line_start = delimiter.linenum
                 inside_code = True
                 arguments = delimiter.arguments
-            elif delimiter.delimiter_type == DelimiterLineType.END_BLOCK and delimiter.type_data.subtype.lower() == "src":
+            elif (
+                delimiter.delimiter_type == DelimiterLineType.END_BLOCK
+                and delimiter.type_data.subtype.lower() == "src"
+            ):
                 inside_code = False
                 start, end = line_start, delimiter.linenum
 
@@ -899,7 +943,11 @@ class Headline:
             content = section["content"]
             code_result = section.get("result", None)
             arguments = section.get("arguments", None)
-            results.append(CodeSnippet(name=name, content=content, result=code_result, arguments=arguments))
+            results.append(
+                CodeSnippet(
+                    name=name, content=content, result=code_result, arguments=arguments
+                )
+            )
 
         return results
 
@@ -941,13 +989,20 @@ Property = collections.namedtuple(
     "Property", ("linenum", "match", "key", "value", "options")
 )
 
+
 class ListItem:
-    def __init__(self,
-        linenum, match,
+    def __init__(
+        self,
+        linenum,
+        match,
         indentation,
-        bullet, counter, counter_sep,
-        checkbox_indentation, checkbox_value,
-        tag_indentation, tag,
+        bullet,
+        counter,
+        counter_sep,
+        checkbox_indentation,
+        checkbox_value,
+        tag_indentation,
+        tag,
         content,
     ):
         self.linenum = linenum
@@ -964,10 +1019,11 @@ class ListItem:
 
     @property
     def text_start_pos(self):
-        return len(self.indentation) + 1 # Indentation + bullet
+        return len(self.indentation) + 1  # Indentation + bullet
 
     def append_line(self, line):
-        self.content += parse_content_block('\n' + line).contents
+        self.content += parse_content_block("\n" + line).contents
+
 
 TableRow = collections.namedtuple(
     "TableRow",
@@ -980,26 +1036,102 @@ TableRow = collections.namedtuple(
     ),
 )
 
+
 # @TODO How are [YYYY-MM-DD HH:mm--HH:mm] and ([... HH:mm]--[... HH:mm]) differentiated ?
 # @TODO Consider recurrence annotations
 class Timestamp:
-    def __init__(self, active, year, month, day, dow, hour, minute, repetition=None):
+    def __init__(
+        self,
+        active: bool = True,
+        year: Optional[int] = None,
+        month: Optional[int] = None,
+        day: Optional[int] = None,
+        dow: Optional[str] = None,
+        hour: Optional[int] = None,
+        minute: Optional[int] = None,
+        repetition: Optional[str] = None,
+        datetime_: Optional[Union[date, datetime]] = None,
+    ):
+        """
+        Initializes a Timestamp instance.
+
+        Args:
+            active (bool): Whether the timestamp is active.
+            year (Optional[int]): The year of the timestamp.
+            month (Optional[int]): The month of the timestamp.
+            day (Optional[int]): The day of the timestamp.
+            dow (Optional[str]): The day of the week, if any.
+            hour (Optional[int]): The hour of the timestamp, if any.
+            minute (Optional[int]): The minute of the timestamp, if any.
+            repetition (Optional[str]): The repetition pattern, if any.
+            datetime_ (Optional[Union[date, datetime]]): A date or datetime object.
+
+        Raises:
+            ValueError: If neither datetime_ nor the combination of year, month, and day are provided.
+        """
         self.active = active
-        self._year = year
-        self._month = month
-        self._day = day
-        self.dow = dow
-        self.hour = hour
-        self.minute = minute
+
+        if datetime_ is not None:
+            self.from_datetime(datetime_)
+        elif year is not None and month is not None and day is not None:
+            self._year = year
+            self._month = month
+            self._day = day
+            self.dow = dow
+            self.hour = hour
+            self.minute = minute
+        else:
+            raise ValueError(
+                "Either datetime_ or year, month, and day must be provided."
+            )
         self.repetition = repetition
 
     def to_datetime(self) -> datetime:
+        """
+        Converts the Timestamp to a datetime object.
+
+        Returns:
+            datetime: The corresponding datetime object.
+        """
         if self.hour is not None:
             return datetime(self.year, self.month, self.day, self.hour, self.minute)
         else:
             return datetime(self.year, self.month, self.day, 0, 0)
 
-    def __add__(self, delta: timedelta):
+    def from_datetime(self, dt: Union[datetime, date]) -> None:
+        """
+        Updates the current Timestamp instance based on a datetime or date object.
+
+        Args:
+            dt (Union[datetime, date]): The datetime or date object to use for updating the instance.
+        """
+        if isinstance(dt, datetime):
+            self._year = dt.year
+            self._month = dt.month
+            self._day = dt.day
+            self.hour = dt.hour
+            self.minute = dt.minute
+        elif isinstance(dt, date):
+            self._year = dt.year
+            self._month = dt.month
+            self._day = dt.day
+            self.hour = None
+            self.minute = None
+        else:
+            raise TypeError("Expected datetime or date object")
+
+        self.dow = None  # Day of the week can be set to None
+
+    def __add__(self, delta: timedelta) -> "Timestamp":
+        """
+        Adds a timedelta to the Timestamp.
+
+        Args:
+            delta (timedelta): The time difference to add.
+
+        Returns:
+            Timestamp: The resulting Timestamp instance.
+        """
         as_dt = self.to_datetime()
         to_dt = as_dt + delta
 
@@ -1010,64 +1142,102 @@ class Timestamp:
             day=to_dt.day,
             dow=None,
             hour=to_dt.hour if self.hour is not None or to_dt.hour != 0 else None,
-            minute=to_dt.minute
-            if self.minute is not None or to_dt.minute != 0
-            else None,
+            minute=(
+                to_dt.minute if self.minute is not None or to_dt.minute != 0 else None
+            ),
             repetition=self.repetition,
         )
 
-    def __eq__(self, other):
+    def __eq__(self, other: object) -> bool:
+        """
+        Checks if two Timestamp instances are equal.
+
+        Args:
+            other (object): The other object to compare with.
+
+        Returns:
+            bool: True if the instances are equal, False otherwise.
+        """
         if not isinstance(other, Timestamp):
             return False
         return (
-            (self.active == other.active)
-            and (self.year == other.year)
-            and (self.month == other.month)
-            and (self.day == other.day)
-            and (self.dow == other.dow)
-            and (self.hour == other.hour)
-            and (self.minute == other.minute)
-            and (self.repetition == other.repetition)
+            self.active == other.active
+            and self.year == other.year
+            and self.month == other.month
+            and self.day == other.day
+            and self.dow == other.dow
+            and self.hour == other.hour
+            and self.minute == other.minute
+            and self.repetition == other.repetition
         )
 
-    def __lt__(self, other):
+    def __lt__(self, other: object) -> bool:
+        """
+        Checks if the Timestamp is less than another Timestamp.
+
+        Args:
+            other (object): The other object to compare with.
+
+        Returns:
+            bool: True if this Timestamp is less than the other, False otherwise.
+        """
         if not isinstance(other, Timestamp):
             return False
         return self.to_datetime() < other.to_datetime()
 
-    def __gt__(self, other):
+    def __gt__(self, other: object) -> bool:
+        """
+        Checks if the Timestamp is greater than another Timestamp.
+
+        Args:
+            other (object): The other object to compare with.
+
+        Returns:
+            bool: True if this Timestamp is greater than the other, False otherwise.
+        """
         if not isinstance(other, Timestamp):
             return False
         return self.to_datetime() > other.to_datetime()
 
-    def __repr__(self):
+    def __repr__(self) -> str:
+        """
+        Returns a string representation of the Timestamp.
+
+        Returns:
+            str: The string representation of the Timestamp.
+        """
         return timestamp_to_string(self)
 
-    # Properties whose modification changes the Day-Of-Week
     @property
-    def year(self):
+    def year(self) -> int:
+        """Returns the year of the timestamp."""
         return self._year
 
     @year.setter
-    def year(self, value):
+    def year(self, value: int) -> None:
+        """Sets the year of the timestamp and resets the day of the week."""
         self._year = value
         self.dow = None
 
     @property
-    def month(self):
+    def month(self) -> int:
+        """Returns the month of the timestamp."""
         return self._month
 
     @month.setter
-    def month(self, value):
+    def month(self, value: int) -> None:
+        """Sets the month of the timestamp and resets the day of the week."""
         self._month = value
         self.dow = None
 
     @property
-    def day(self):
+    def day(self) -> int:
+        """Returns the day of the timestamp."""
         return self._day
 
     @day.setter
-    def day(self, value):
+    def day(self, value: int) -> None:
+        """Sets the day of the timestamp and resets the day of the week."""
         self._day = value
         self.dow = None
 
@@ -1077,9 +1247,7 @@ class DelimiterLineType(Enum):
     END_BLOCK = 2
 
 
-BlockDelimiterTypeData = collections.namedtuple(
-    "BlockDelimiterTypeData", ("subtype")
-)
+BlockDelimiterTypeData = collections.namedtuple("BlockDelimiterTypeData", ("subtype"))
 
 DelimiterLine = collections.namedtuple(
     "DelimiterLine", ("linenum", "line", "delimiter_type", "type_data", "arguments")
@@ -1129,90 +1297,153 @@ def token_from_type(tok_type):
 
 
 class TimeRange:
-    def __init__(self, start_time: OrgTime, end_time: OrgTime):
-        assert start_time is not None
-        assert end_time is not None
+    """Represents a range of time with a start and end time.
+
+    Attributes:
+        start_time (OrgTime): The start time of the range.
+        end_time (OrgTime): The end time of the range.
+    """
+
+    def __init__(self, start_time: OrgTime, end_time: OrgTime) -> None:
+        """Initializes a TimeRange with a start time and an end time.
+
+        Args:
+            start_time (OrgTime): The start time of the range.
+            end_time (OrgTime): The end time of the range.
+
+        Raises:
+            AssertionError: If start_time or end_time is None.
+        """
+        if start_time is None or end_time is None:
+            raise ValueError("start_time and end_time must not be None.")
         self.start_time = start_time
         self.end_time = end_time
 
     def to_raw(self) -> str:
+        """Converts the TimeRange to its raw string representation.
+
+        Returns:
+            str: The raw string representation of the TimeRange.
+        """
         return timerange_to_string(self)
 
     @property
     def duration(self) -> timedelta:
+        """Calculates the duration of the TimeRange.
+
+        Returns:
+            timedelta: The duration between start_time and end_time.
+        """
         delta = self.end - self.start
         return delta
 
     @property
     def start(self) -> datetime:
+        """Gets the start time as a datetime object.
+
+        Returns:
+            datetime: The start time of the TimeRange.
+        """
         return self.start_time.time.to_datetime()
 
     @property
     def end(self) -> datetime:
+        """Gets the end time as a datetime object.
+
+        Returns:
+            datetime: The end time of the TimeRange.
+        """
         return self.end_time.time.to_datetime()
 
+    def activate(self) -> None:
+        """
+        Sets the active state for the times.
+        """
+        self.start_time.active = True
+        self.end_time.active = True
 
-def parse_time(value: str) -> Union[None, TimeRange, OrgTime]:
-    if (value.count(">--<") == 1) or (value.count("]--[") == 1):
-        # Time ranges with two different dates
-        # @TODO properly consider "=> DURATION" section
-        start, end = value.split("=")[0].split("--")
-        as_time_range = parse_org_time_range(start, end)
-        if as_time_range is None:
-            return None
-
-        if (as_time_range.start_time is not None) and (
-            as_time_range.end_time is not None
-        ):
-            return as_time_range
-        else:
-            raise Exception("Unknown time range format: {}".format(value))
-    elif as_time := OrgTime.parse(value):
-        return as_time
-    else:
-        return None
-
-
-def parse_org_time_range(start, end) -> Optional[TimeRange]:
-    start_time = OrgTime.parse(start)
-    end_time = OrgTime.parse(end)
-
-    if start_time is None or end_time is None:
-        return None
-    return TimeRange(start_time, end_time)
+    def deactivate(self) -> None:
+        """
+        Sets the inactive state for the times.
+        """
+        self.start_time.active = False
+        self.end_time.active = False
 
 
 class OrgTime:
-    def __init__(self, ts: Timestamp, end_time: Optional[Timestamp] = None):
-        assert ts is not None
+    """Represents a point in time with optional end time and repetition.
+
+    Attributes:
+        time (Timestamp): The start time of the OrgTime instance.
+        end_time (Optional[Timestamp]): The end time of the OrgTime instance, if any.
+    """
+
+    def __init__(self, ts: Timestamp, end_time: Optional[Timestamp] = None) -> None:
+        """Initializes an OrgTime with a start time and an optional end time.
+
+        Args:
+            ts (Timestamp): The start time of the OrgTime instance.
+            end_time (Optional[Timestamp], optional): The end time of the OrgTime instance. Defaults to None.
+
+        Raises:
+            ValueError: If ts is None.
+        """
+        if ts is None:
+            raise ValueError("Timestamp (ts) must not be None.")
         self.time = ts
         self.end_time = end_time
 
     @property
-    def repetition(self):
+    def repetition(self) -> Optional[str]:
+        """Gets the repetition information from the start time.
+
+        Returns:
+            Optional[str]: The repetition information, or None if not present.
+        """
         return self.time.repetition
 
     @property
-    def duration(self):
+    def duration(self) -> timedelta:
+        """Calculates the duration between the start and end times.
+
+        Returns:
+            timedelta: The duration between the start and end times. If no end time is present, returns zero timedelta.
+        """
         if self.end_time is None:
             return timedelta()  # No duration
-        else:
-            return self.end_time.to_datetime() - self.time.to_datetime()
+        return self.end_time.to_datetime() - self.time.to_datetime()
 
-    def to_raw(self):
+    def to_raw(self) -> str:
+        """Converts the OrgTime to its raw string representation.
+
+        Returns:
+            str: The raw string representation of the OrgTime.
+        """
         return timestamp_to_string(self.time, self.end_time)
 
-    def __repr__(self):
+    def __repr__(self) -> str:
+        """Provides a string representation of the OrgTime instance.
+
+        Returns:
+            str: The string representation of the OrgTime.
+        """
         return f"OrgTime({self.to_raw()})"
 
     @classmethod
-    def parse(self, value: str) -> Optional[OrgTime]:
+    def parse(cls, value: str) -> Optional["OrgTime"]:
+        """Parses a string into an OrgTime object.
+
+        Args:
+            value (str): The string representation of the OrgTime.
+
+        Returns:
+            Optional[OrgTime]: The parsed OrgTime instance, or None if parsing fails.
+        """
         if m := ACTIVE_TIME_STAMP_RE.match(value):
             active = True
         elif m := INACTIVE_TIME_STAMP_RE.match(value):
             active = False
         else:
-            # raise ArgumentError("Cannot parse `{}` as OrgTime".format(value))
             return None
 
         repetition = None
@@ -1220,7 +1451,7 @@ class OrgTime:
             repetition = m.group("repetition").strip()
 
         if m.group("end_hour"):
-            return OrgTime(
+            return cls(
                 Timestamp(
                     active,
                     int(m.group("year")),
@@ -1242,7 +1473,7 @@ class OrgTime:
                 ),
             )
 
-        return OrgTime(
+        return cls(
             Timestamp(
                 active,
                 int(m.group("year")),
@@ -1254,6 +1485,29 @@ class OrgTime:
                 repetition=repetition,
             )
         )
+
+    def activate(self) -> None:
+        """
+        Sets the active state for the timestamp.
+        """
+        self.time.active = True
+
+    def deactivate(self) -> None:
+        """
+        Sets the inactive state for the timestamp.
+        """
+        self.time.active = False
+
+    def from_datetime(self, dt: datetime) -> None:
+        """
+        Updates the timestamp to use the given datetime.
+
+        Args:
+            dt (datetime): The datetime to update the timestamp with.
+        """
+        self.time.from_datetime(dt)
+        if self.end_time:
+            self.end_time.from_datetime(dt)
 
 
 def time_from_str(s: str) -> Optional[OrgTime]:
@@ -1294,6 +1548,39 @@ def timestamp_to_string(ts: Timestamp, end_time: Optional[Timestamp] = None) -> 
         return "[{}]".format(base)
 
 
+Time = Union[TimeRange, OrgTime]
+
+
+def parse_time(value: str) -> Optional[Time]:
+    if (value.count(">--<") == 1) or (value.count("]--[") == 1):
+        # Time ranges with two different dates
+        # @TODO properly consider "=> DURATION" section
+        start, end = value.split("=")[0].split("--")
+        as_time_range = parse_org_time_range(start, end)
+        if as_time_range is None:
+            return None
+
+        if (as_time_range.start_time is not None) and (
+            as_time_range.end_time is not None
+        ):
+            return as_time_range
+        else:
+            raise Exception("Unknown time range format: {}".format(value))
+    elif as_time := OrgTime.parse(value):
+        return as_time
+    else:
+        return None
+
+
+def parse_org_time_range(start, end) -> Optional[TimeRange]:
+    start_time = OrgTime.parse(start)
+    end_time = OrgTime.parse(end)
+
+    if start_time is None or end_time is None:
+        return None
+    return TimeRange(start_time, end_time)
+
+
 def get_raw(doc):
     if isinstance(doc, str):
         return doc
@@ -1317,7 +1604,9 @@ class Line:
 
 
 class Link:
-    def __init__(self, value: str, description: Optional[str], origin: Optional[RangeInRaw]):
+    def __init__(
+        self, value: str, description: Optional[str], origin: Optional[RangeInRaw]
+    ):
         self._value = value
         self._description = description
         self._origin = origin
@@ -1334,7 +1623,8 @@ class Link:
         if self._description:
             new_contents.append(LinkToken(LinkTokenType.OPEN_DESCRIPTION))
             new_contents.append(self._description)
-        self._origin.update_range(new_contents)
+        if self._origin is not None:
+            self._origin.update_range(new_contents)
 
     @property
     def value(self):
@@ -1369,6 +1659,7 @@ class Text:
     def get_raw(self):
         return token_list_to_raw(self.contents)
 
+
 def token_list_to_plaintext(tok_list) -> str:
     contents = []
     in_link = False
@@ -1393,7 +1684,7 @@ def token_list_to_plaintext(tok_list) -> str:
                 if not in_description:
                     # This might happen when link doesn't have a separate description
                     link_description = link_url
-                contents.append(''.join(link_description))
+                contents.append("".join(link_description))
 
                 in_link = False
                 in_description = False
@@ -1403,6 +1694,7 @@ def token_list_to_plaintext(tok_list) -> str:
             assert isinstance(chunk, MarkerToken)
 
     return "".join(contents)
+
 
 def token_list_to_raw(tok_list):
     contents = []
@@ -1531,13 +1823,11 @@ TOKEN_TYPE_OPEN_LINK = 3
 TOKEN_TYPE_CLOSE_LINK = 4
 TOKEN_TYPE_OPEN_DESCRIPTION = 5
 
-TokenItems = Union[
-    Tuple[int, Union[None, str, MarkerToken]],
-]
+TokenItems = Union[Tuple[int, Union[None, str, MarkerToken]],]
 
 
 def tokenize_contents(contents: str) -> List[TokenItems]:
-    tokens: List[TokenItems]  = []
+    tokens: List[TokenItems] = []
     last_char = None
 
     text: List[str] = []
@@ -1686,7 +1976,7 @@ def parse_contents(raw_contents: List[RawLine]):
     return [parse_content_block(block) for block in blocks]
 
 
-def parse_content_block(raw_contents: Union[List[RawLine],str]):
+def parse_content_block(raw_contents: Union[List[RawLine], str]):
     contents_buff = []
     if isinstance(raw_contents, str):
         contents_buff.append(raw_contents)
@@ -1703,7 +1993,7 @@ def parse_content_block(raw_contents: Union[List[RawLine],str]):
 
     contents: List[Union[str, MarkerToken, LinkToken]] = []
     # Use tokens to tag chunks of text with it's container type
-    for (tok_type, tok_val) in tokens:
+    for tok_type, tok_val in tokens:
         if tok_type == TOKEN_TYPE_TEXT:
             assert isinstance(tok_val, str)
             contents.append(tok_val)
@@ -1730,17 +2020,21 @@ def dump_contents(raw):
     elif isinstance(raw, ListItem):
         bullet = raw.bullet if raw.bullet else raw.counter + raw.counter_sep
         content_full = token_list_to_raw(raw.content)
-        content_lines = content_full.split('\n')
-        content = '\n'.join(content_lines)
+        content_lines = content_full.split("\n")
+        content = "\n".join(content_lines)
         checkbox = f"[{raw.checkbox_value}]" if raw.checkbox_value else ""
-        tag = f"{raw.tag_indentation}{token_list_to_raw(raw.tag or '')}::" if raw.tag or raw.tag_indentation else ""
+        tag = (
+            f"{raw.tag_indentation}{token_list_to_raw(raw.tag or '')}::"
+            if raw.tag or raw.tag_indentation
+            else ""
+        )
         return (
             raw.linenum,
             f"{raw.indentation}{bullet} {checkbox}{tag}{content}",
         )
 
     elif isinstance(raw, TableRow):
-        closed = '|' if raw.last_cell_closed else ''
+        closed = "|" if raw.last_cell_closed else ""
         return (
             raw.linenum,
             f"{' ' * raw.indentation}|{'|'.join(raw.cells)}{closed}{raw.suffix}",
@@ -1784,7 +2078,9 @@ def parse_headline(hl, doc, parent) -> Headline:
     contents = parse_contents(hl["contents"])
 
     if not (isinstance(parent, OrgDoc) or depth > parent.depth):
-        raise AssertionError("Incorrectly parsed parent on `{}' > `{}'".format(parent.title, title))
+        raise AssertionError(
+            "Incorrectly parsed parent on `{}' > `{}'".format(parent.title, title)
+        )
 
     headline = Headline(
         start_line=hl["linenum"],
@@ -1936,7 +2232,7 @@ class OrgDoc:
         Created by org-roam v2.
         """
         for p in self.properties:
-            if p.key == 'ID':
+            if p.key == "ID":
                 return p.value
         return None
 
@@ -2158,9 +2454,14 @@ class OrgDocReader:
         self.headline_hierarchy.append(headline)
 
         if all([hl is not None for hl in self.headline_hierarchy]):
-            if not ([ len(cast(HeadlineDict, hl)['orig'].group('stars')) for hl in self.headline_hierarchy ]
-                    == list(range(1, len(self.headline_hierarchy) + 1))):
-                raise AssertionError('Error on Headline Hierarchy')
+            if not (
+                [
+                    len(cast(HeadlineDict, hl)["orig"].group("stars"))
+                    for hl in self.headline_hierarchy
+                ]
+                == list(range(1, len(self.headline_hierarchy) + 1))
+            ):
+                raise AssertionError("Error on Headline Hierarchy")
         else:
             # This might happen if headlines with more that 1 level deeper are found
             pass
@@ -2181,9 +2482,13 @@ class OrgDocReader:
             checkbox_indentation=match.group("checkbox_indentation"),
             checkbox_value=match.group("checkbox_value"),
             tag_indentation=match.group("tag_indentation"),
-            tag=parse_content_block(
-                [RawLine(linenum=linenum, line=match.group("tag"))]
-            ).contents if match.group("tag") else None,
+            tag=(
+                parse_content_block(
+                    [RawLine(linenum=linenum, line=match.group("tag"))]
+                ).contents
+                if match.group("tag")
+                else None
+            ),
             content=parse_content_block(
                 [RawLine(linenum=linenum, line=match.group("content"))]
             ).contents,
@@ -2197,14 +2502,14 @@ class OrgDocReader:
         return li
 
     def add_table_line(self, linenum: int, line: str):
-        chunks = line.split('|')
+        chunks = line.split("|")
         indentation = len(chunks[0])
-        if chunks[-1].strip() == '':
+        if chunks[-1].strip() == "":
             suffix = chunks[-1]
             cells = chunks[1:-1]
             last_cell_closed = True
         else:
-            suffix = ''
+            suffix = ""
             cells = chunks[1:]
             last_cell_closed = False
 
@@ -2246,8 +2551,13 @@ class OrgDocReader:
             self.headline_hierarchy[-1]["contents"].append(raw)
 
     def add_begin_block_line(self, linenum: int, match: re.Match):
-        line = DelimiterLine(linenum, match.group(0), DelimiterLineType.BEGIN_BLOCK,
-                             BlockDelimiterTypeData(match.group("subtype")), match.group('arguments'))
+        line = DelimiterLine(
+            linenum,
+            match.group(0),
+            DelimiterLineType.BEGIN_BLOCK,
+            BlockDelimiterTypeData(match.group("subtype")),
+            match.group("arguments"),
+        )
         if len(self.headline_hierarchy) == 0:
             self.delimiters.append(line)
         else:
@@ -2255,8 +2565,13 @@ class OrgDocReader:
             self.headline_hierarchy[-1]["delimiters"].append(line)
 
     def add_end_block_line(self, linenum: int, match: re.Match):
-        line = DelimiterLine(linenum, match.group(0), DelimiterLineType.END_BLOCK,
-                             BlockDelimiterTypeData(match.group("subtype")), None)
+        line = DelimiterLine(
+            linenum,
+            match.group(0),
+            DelimiterLineType.END_BLOCK,
+            BlockDelimiterTypeData(match.group("subtype")),
+            None,
+        )
         if len(self.headline_hierarchy) == 0:
             self.delimiters.append(line)
         else:
@@ -2318,8 +2633,8 @@ class OrgDocReader:
             nonlocal list_item
             nonlocal list_item_indentation
             if list_item:
-                if ((line[:list_item.text_start_pos].strip() == '')
-                    or (len(line.strip()) == 0)
+                if (line[: list_item.text_start_pos].strip() == "") or (
+                    len(line.strip()) == 0
                 ):
                     list_item.append_line(line)
                     added = True
@@ -2382,7 +2697,7 @@ class OrgDocReader:
                     list_item = None
                 elif m := NODE_PROPERTIES_RE.match(line):
                     self.add_node_properties_line(linenum, m)
-                elif line.strip().startswith('|'):
+                elif line.strip().startswith("|"):
                     self.add_table_line(linenum, line)
                     list_item_indentation = None
                     list_item = None
@@ -2428,7 +2743,9 @@ def loads(s, environment=BASE_ENVIRONMENT, extra_cautious=True):
                         context_last_line = None
             # print("---\n" + after_dump + "\n---")
 
-            raise NonReproducibleDocument("Difference found between existing version and dumped")
+            raise NonReproducibleDocument(
+                "Difference found between existing version and dumped"
+            )
     return doc
 
 
