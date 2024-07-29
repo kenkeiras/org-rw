@@ -364,12 +364,12 @@ class Headline:
                 )
             ]
 
-            if scheduled := m.group("scheduled"):
-                self.scheduled = parse_time(scheduled)
-            if closed := m.group("closed"):
-                self.closed = parse_time(closed)
-            if deadline := m.group("deadline"):
-                self.deadline = parse_time(deadline)
+            if scheduled_m := m.group("scheduled"):
+                self.scheduled = parse_time(scheduled_m)
+            if closed_m := m.group("closed"):
+                self.closed = parse_time(closed_m)
+            if deadline_m := m.group("deadline"):
+                self.deadline = parse_time(deadline_m)
 
             # Remove from contents
             self._remove_element_in_line(start_line + 1)
@@ -1094,7 +1094,7 @@ class Timestamp:
             datetime: The corresponding datetime object.
         """
         if self.hour is not None:
-            return datetime(self.year, self.month, self.day, self.hour, self.minute)
+            return datetime(self.year, self.month, self.day, self.hour, self.minute or 0)
         else:
             return datetime(self.year, self.month, self.day, 0, 0)
 
@@ -1486,17 +1486,32 @@ class OrgTime:
             )
         )
 
+    @property
+    def active(self) -> bool:
+        """
+        Checks if the time is set as active.
+        """
+        return self.time.active
+
+
+    @active.setter
+    def active(self, value: bool) -> None:
+        """
+        Sets the active state for the timestamp.
+        """
+        self.time.active = value
+
     def activate(self) -> None:
         """
         Sets the active state for the timestamp.
         """
-        self.time.active = True
+        self.active = True
 
     def deactivate(self) -> None:
         """
         Sets the inactive state for the timestamp.
         """
-        self.time.active = False
+        self.active = False
 
     def from_datetime(self, dt: datetime) -> None:
         """
@@ -1527,7 +1542,7 @@ def timestamp_to_string(ts: Timestamp, end_time: Optional[Timestamp] = None) -> 
 
     if ts.hour is not None:
         base = "{date} {hour:02}:{minute:02d}".format(
-            date=date, hour=ts.hour, minute=ts.minute
+            date=date, hour=ts.hour, minute=ts.minute or 0
         )
     else:
         base = date
