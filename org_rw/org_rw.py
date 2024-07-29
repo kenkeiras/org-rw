@@ -9,7 +9,7 @@ import re
 import sys
 from datetime import date, datetime, timedelta
 from enum import Enum
-from typing import cast, Iterator, List, Optional, Tuple, Union
+from typing import cast, Iterator, List, Literal, Optional, Tuple, TypedDict, Union
 
 from .types import HeadlineDict
 
@@ -18,8 +18,12 @@ from . import dom
 
 DEBUG_DIFF_CONTEXT = 10
 
+DEFAULT_TODO_KEYWORDS = ["TODO"]
+DEFAULT_DONE_KEYWORDS = ["DONE"]
+
 BASE_ENVIRONMENT = {
     "org-footnote-section": "Footnotes",
+    "org-todo-keywords": ' '.join(DEFAULT_TODO_KEYWORDS) + ' | ' + ' '.join(DEFAULT_DONE_KEYWORDS),
     "org-options-keywords": (
         "ARCHIVE:",
         "AUTHOR:",
@@ -52,9 +56,6 @@ BASE_ENVIRONMENT = {
         "EXCLUDE_TAGS:",
     ),
 }
-
-DEFAULT_TODO_KEYWORDS = ["TODO"]
-DEFAULT_DONE_KEYWORDS = ["DONE"]
 
 HEADLINE_TAGS_RE = re.compile(r"((:(\w|[0-9_@#%])+)+:)\s*$")
 HEADLINE_RE = re.compile(r"^(?P<stars>\*+)(?P<spacing>\s+)(?P<line>.*?)$")
@@ -113,6 +114,15 @@ NON_FINISHED_GROUPS = (
     dom.PropertyDrawerNode,
 )
 FREE_GROUPS = (dom.CodeBlock,)
+
+# States
+class HeadlineState(TypedDict):
+    # To be extended to handle keyboard shortcuts
+    name: str
+
+class OrgDocDeclaredStates(TypedDict):
+    not_completed: List[HeadlineState]
+    completed: List[HeadlineState]
 
 
 class NonReproducibleDocument(Exception):
@@ -354,12 +364,12 @@ class Headline:
                 )
             ]
 
-            if scheduled := m.group("scheduled"):
-                self.scheduled = parse_time(scheduled)
-            if closed := m.group("closed"):
-                self.closed = parse_time(closed)
-            if deadline := m.group("deadline"):
-                self.deadline = parse_time(deadline)
+            if scheduled_m := m.group("scheduled"):
+                self.scheduled = parse_time(scheduled_m)
+            if closed_m := m.group("closed"):
+                self.closed = parse_time(closed_m)
+            if deadline_m := m.group("deadline"):
+                self.deadline = parse_time(deadline_m)
 
             # Remove from contents
             self._remove_element_in_line(start_line + 1)
@@ -1084,7 +1094,7 @@ class Timestamp:
             datetime: The corresponding datetime object.
         """
         if self.hour is not None:
-            return datetime(self.year, self.month, self.day, self.hour, self.minute)
+            return datetime(self.year, self.month, self.day, self.hour, self.minute or 0)
         else:
             return datetime(self.year, self.month, self.day, 0, 0)
 
@@ -1476,17 +1486,32 @@ class OrgTime:
             )
         )
 
+    @property
+    def active(self) -> bool:
+        """
+        Checks if the time is set as active.
+        """
+        return self.time.active
+
+
+    @active.setter
+    def active(self, value: bool) -> None:
+        """
+        Sets the active state for the timestamp.
+        """
+        self.time.active = value
+
     def activate(self) -> None:
         """
         Sets the active state for the timestamp.
         """
-        self.time.active = True
+        self.active = True
 
     def deactivate(self) -> None:
         """
         Sets the inactive state for the timestamp.
         """
-        self.time.active = False
+        self.active = False
 
     def from_datetime(self, dt: datetime) -> None:
         """
@@ -1517,7 +1542,7 @@ def timestamp_to_string(ts: Timestamp, end_time: Optional[Timestamp] = None) -> 
 
     if ts.hour is not None:
         base = "{date} {hour:02}:{minute:02d}".format(
-            date=date, hour=ts.hour, minute=ts.minute
+            date=date, hour=ts.hour, minute=ts.minute or 0
         )
     else:
         base = date
@@ -2052,16 +2077,16 @@ def parse_headline(hl, doc, parent) -> Headline:
     title = line
     is_done = is_todo = False
     for state in doc.todo_keywords or []:
-        if title.startswith(state + " "):
+        if title.startswith(state['name'] + " "):
             hl_state = state
-            title = title[len(state + " ") :]
+            title = title[len(state['name'] + " ") :]
             is_todo = True
             break
     else:
         for state in doc.done_keywords or []:
-            if title.startswith(state + " "):
+            if title.startswith(state['name'] + " "):
                 hl_state = state
-                title = title[len(state + " ") :]
+                title = title[len(state['name'] + " ") :]
                 is_done = True
                 break
 
@@ -2158,21 +2183,53 @@ def dump_delimiters(line: DelimiterLine):
     return (line.linenum, line.line)
 
 
+def parse_todo_done_keywords(line: str) -> OrgDocDeclaredStates:
+    clean_line = re.sub(r"\([^)]+\)", "", line)
+    if '|' in clean_line:
+        todo_kws, done_kws = clean_line.split("|", 1)
+        has_split = True
+    else:
+        # Standard behavior in this case is: the last state is the one considered as DONE
+        todo_kws = clean_line
+
+    todo_keywords = re.sub(r"\s{2,}", " ", todo_kws.strip()).split()
+    if has_split:
+        done_keywords = re.sub(r"\s{2,}", " ", done_kws.strip()).split()
+    else:
+        done_keywods = [todo_keywords[-1]]
+        todo_keywords = todo_keywords[:-1]
+
+    return {
+        "not_completed": [
+            HeadlineState(name=keyword)
+            for keyword in todo_keywords
+        ],
+        "completed": [
+            HeadlineState(name=keyword)
+            for keyword in done_keywords
+        ],
+    }
+
+
 class OrgDoc:
     def __init__(
-        self, headlines, keywords, contents, list_items, structural, properties
+        self, headlines, keywords, contents, list_items, structural, properties,
+        environment=BASE_ENVIRONMENT,
     ):
-        self.todo_keywords = DEFAULT_TODO_KEYWORDS
-        self.done_keywords = DEFAULT_DONE_KEYWORDS
+        self.todo_keywords = [HeadlineState(name=kw) for kw in DEFAULT_TODO_KEYWORDS]
+        self.done_keywords = [HeadlineState(name=kw) for kw in DEFAULT_DONE_KEYWORDS]
 
+        keywords_set_in_file = False
         for keyword in keywords:
             if keyword.key in ("TODO", "SEQ_TODO"):
-                todo_kws, done_kws = re.sub(r"\([^)]+\)", "", keyword.value).split(
-                    "|", 1
-                )
+                states = parse_todo_done_keywords(keyword.value)
+                self.todo_keywords, self.done_keywords = states['not_completed'], states['completed']
+                keywords_set_in_file = True
 
-                self.todo_keywords = re.sub(r"\s{2,}", " ", todo_kws.strip()).split()
-                self.done_keywords = re.sub(r"\s{2,}", " ", done_kws.strip()).split()
+        if not keywords_set_in_file and 'org-todo-keywords' in environment:
+            # Read keywords from environment
+            states = parse_todo_done_keywords(environment['org-todo-keywords'])
+            self.todo_keywords, self.done_keywords = states['not_completed'], states['completed']
 
         self.keywords: List[Property] = keywords
         self.contents: List[RawLine] = contents
@@ -2247,7 +2304,7 @@ class OrgDoc:
 
         state = ""
         if headline.state:
-            state = headline.state + " "
+            state = headline.state['name'] + " "
 
         raw_title = token_list_to_raw(headline.title.contents)
         tags_padding = ""
@@ -2348,7 +2405,7 @@ class OrgDoc:
 
 
 class OrgDocReader:
-    def __init__(self):
+    def __init__(self, environment=BASE_ENVIRONMENT):
         self.headlines: List[HeadlineDict] = []
         self.keywords: List[Keyword] = []
         self.headline_hierarchy: List[Optional[HeadlineDict]] = []
@@ -2359,6 +2416,7 @@ class OrgDocReader:
         self.structural: List = []
         self.properties: List = []
         self.current_drawer: Optional[List] = None
+        self.environment = environment
 
     def finalize(self):
         return OrgDoc(
@@ -2368,6 +2426,7 @@ class OrgDocReader:
             self.list_items,
             self.structural,
             self.properties,
+            self.environment,
         )
 
     ## Construction
@@ -2575,7 +2634,7 @@ class OrgDocReader:
 
         self.current_drawer.append(Property(linenum, match, key, value, None))
 
-    def read(self, s, environment):
+    def read(self, s):
         lines = s.split("\n")
         line_count = len(lines)
         reader = enumerate(lines)
@@ -2666,8 +2725,8 @@ class OrgDocReader:
 
 
 def loads(s, environment=BASE_ENVIRONMENT, extra_cautious=True):
-    reader = OrgDocReader()
-    reader.read(s, environment)
+    reader = OrgDocReader(environment)
+    reader.read(s)
     doc = reader.finalize()
     if extra_cautious:  # Check that all options can be properly re-serialized
         after_dump = dumps(doc)
