@@ -865,6 +865,46 @@ class TestSerde(unittest.TestCase):
 
         self.assertEqual(dumps(doc), orig)
 
+    def test_update_reparse(self):
+        with open(os.path.join(DIR, "01-simple.org")) as f:
+            doc = load(f)
+
+        hl = doc.getTopHeadlines()[0]
+        ex = HL(
+            "First level",
+            props=[
+                ("ID", "01-simple-first-level-id"),
+                ("CREATED", DT(2020, 1, 1, 1, 1)),
+            ],
+            content="  First level content\n",
+            children=[
+                HL(
+                    "Second level",
+                    props=[("ID", "01-simple-second-level-id")],
+                    content="\n   Second level content\n",
+                    children=[
+                        HL(
+                            "Third level",
+                            props=[("ID", "01-simple-third-level-id")],
+                            content="\n    Third level content\n",
+                        )
+                    ],
+                )
+            ],
+        )
+
+        # Ground check
+        ex.assert_matches(self, hl)
+
+        # Update
+        lines = list(doc.dump_headline(hl, recursive=False))
+        assert lines[0].startswith('* ')  # Title, skip it
+        content = '\n'.join(lines[1:])
+        hl.update_raw_contents(content)
+
+        # Check after update
+        ex.assert_matches(self, hl)
+
 
 def print_tree(tree, indentation=0, headline=None):
     for element in tree:
