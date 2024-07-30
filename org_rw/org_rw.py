@@ -1026,6 +1026,9 @@ Keyword = collections.namedtuple(
 Property = collections.namedtuple(
     "Property", ("linenum", "match", "key", "value", "options")
 )
+Structural = collections.namedtuple(
+    "Structural", ("linenum", "line")
+)
 
 
 class ListItem:
@@ -1074,17 +1077,14 @@ TableRow = collections.namedtuple(
     ),
 )
 
-ItemWithLineNum = Union[Keyword, RawLine, Property, ListItem, tuple[int, Any]]
+ItemWithLineNum = Union[Keyword, RawLine, Property, ListItem, Structural]
 def offset_linenum(offset: int, item: ItemWithLineNum) -> ItemWithLineNum:
-    if isinstance(item, tuple) and len(item) == 2 and isinstance(item[0], int):
-        return item
-
     if isinstance(item, ListItem):
         item.linenum += offset
         return item
 
-    assert isinstance(item, (Keyword, RawLine, Property)), \
-        "Expected (Keyword|RawLine|Property), found {}".format(item)
+    assert isinstance(item, (Keyword, RawLine, Property, Structural)), \
+        "Expected (Keyword|RawLine|Property|Structural), found {}".format(item)
     return item._replace(linenum=item.linenum + offset)
 
 
@@ -2465,8 +2465,8 @@ class OrgDocReader:
         self.delimiters: List[DelimiterLine] = []
         self.list_items: List[ListItem] = []
         self.table_rows: List[TableRow] = []
-        self.structural: List = []
-        self.properties: List = []
+        self.structural: List[Structural] = []
+        self.properties: List[Property] = []
         self.current_drawer: Optional[List] = None
         self.environment = environment
 
@@ -2648,7 +2648,7 @@ class OrgDocReader:
     def add_property_drawer_line(self, linenum: int, line: str, match: re.Match):
         if len(self.headline_hierarchy) == 0:
             self.current_drawer = self.properties
-            self.structural.append((linenum, line))
+            self.structural.append(Structural(linenum, line))
         else:
             assert self.headline_hierarchy[-1] is not None
             self.current_drawer = self.headline_hierarchy[-1]["properties"]
@@ -2667,7 +2667,7 @@ class OrgDocReader:
     def add_drawer_end_line(self, linenum: int, line: str, match: re.Match):
         self.current_drawer = None
         if len(self.headline_hierarchy) == 0:
-            self.structural.append((linenum, line))
+            self.structural.append(Structural(linenum, line))
         else:
             assert self.headline_hierarchy[-1] is not None
             self.headline_hierarchy[-1]["structural"].append((linenum, line))
