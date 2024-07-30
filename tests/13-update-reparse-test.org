@@ -1,0 +1,22 @@
+#+TITLE: 13-Update reparse
+#+DESCRIPTION: Update-Reparse org file
+#+TODO: TODO(t) PAUSED(p) |  DONE(d)
+
+
+* First level
+  :PROPERTIES:
+  :ID:       13-update-reparse-first-level-id
+  :CREATED:  [2020-01-01 Wed 01:01]
+  :END:
+  First level content
+
+  - A list of items ::
+    - With a sublist
+
+  Something after the list.
+
+** Second level
+   :PROPERTIES:
+   :ID:       13-update-reparse-second-level-id
+   :END:
+   Second level content

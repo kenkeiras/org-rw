@@ -1,4 +1,5 @@
 import os
+import tempfile
 import unittest
 from datetime import datetime as DT
 
@@ -865,7 +866,7 @@ class TestSerde(unittest.TestCase):
 
         self.assertEqual(dumps(doc), orig)
 
-    def test_update_reparse(self):
+    def test_update_reparse_same_structure(self):
         with open(os.path.join(DIR, "01-simple.org")) as f:
             doc = load(f)
 
@@ -905,6 +906,45 @@ class TestSerde(unittest.TestCase):
         # Check after update
         ex.assert_matches(self, hl, accept_trailing_whitespace_changes=True)
 
+    def test_update_reparse_same_values(self):
+        with open(os.path.join(DIR, "13-update-reparse-test.org")) as f:
+            doc = load(f)
+
+        expected_hl_contents = '''  :PROPERTIES:
+  :ID:       13-update-reparse-first-level-id
+  :CREATED:  [2020-01-01 Wed 01:01]
+  :END:
+  First level content
+
+  - A list of items ::
+    - With a sublist
+
+  Something after the list.
+'''
+
+        hl = doc.getTopHeadlines()[0]
+        lines = list(doc.dump_headline(hl, recursive=False))
+        assert lines[0].startswith('* ')  # Title, skip it
+        content = '\n'.join(lines[1:])
+        self.assertEqual(content, expected_hl_contents)
+
+        # Check after update
+        hl.update_raw_contents(content)
+        self.assertEqual(content, expected_hl_contents)
+
+        # Check after dump and reload
+        with tempfile.NamedTemporaryFile('wt') as f:
+            save = org_rw.dumps(doc)
+            f.write(save)
+            f.flush()
+
+            with open(f.name, 'rt') as reader:
+                reloaded = org_rw.load(reader)
+                re_hl = reloaded.getTopHeadlines()[0]
+                lines = list(doc.dump_headline(hl, recursive=False))
+                assert lines[0].startswith('* ')  # Title, skip it
+                content = '\n'.join(lines[1:])
+                self.assertEqual(content, expected_hl_contents)
 
 def print_tree(tree, indentation=0, headline=None):
     for element in tree:
