@@ -1,5 +1,4 @@
 from __future__ import annotations
-from typing import Optional
 from datetime import timedelta
 import collections
 import difflib
@@ -9,7 +8,7 @@ import re
 import sys
 from datetime import date, datetime, timedelta
 from enum import Enum
-from typing import cast, Iterator, List, Literal, Optional, Tuple, TypedDict, Union
+from typing import Any, cast, Iterator, List, Literal, Optional, Tuple, TypedDict, TypeVar, Union
 
 from .types import HeadlineDict
 
@@ -821,7 +820,7 @@ class Headline:
             raise NotImplementedError()
 
     def update_raw_contents(self, new_contents):
-        # @TODO: Properly re-parse elements
+        # Clear elements
         self.keywords = []
         self.contents = []
         self.list_items = []
@@ -833,10 +832,31 @@ class Headline:
         self.deadline = None
         self.closed = None
 
-        for line in new_contents.split('\n'):
-            self.contents.append(
-                RawLine(linenum=0, line=line)
-            )
+        reader = OrgDocReader(environment=self.doc.environment)
+        reader.read(new_contents)
+
+        # No need to finalize as we can take the data from the reader instead of from a doc
+        if len(reader.headlines) > 0:
+            # Probably can be done by just adding the headlines to this one's children
+            raise NotImplementedError('new headlines on raw contents not supported yet. This probably should be simple, see comment on code.')
+
+        for kw in reader.keywords:
+            self.keywords.append(offset_linenum(self.start_line + 1, kw))
+
+        for content in reader.contents:
+            self.contents.append(offset_linenum(self.start_line + 1, content))
+
+        for list_item in reader.list_items:
+            self.list_items.append(offset_linenum(self.start_line + 1, list_item))
+
+        for struct_item in reader.structural:
+            self.structural.append(offset_linenum(self.start_line + 1, struct_item))
+
+        for prop in reader.properties:
+            self.properties.append(offset_linenum(self.start_line + 1, prop))
+
+        # Environment is not used, as it's known
+
 
     def get_element_in_line(self, linenum):
         for line in self.contents:
@@ -1053,6 +1073,19 @@ TableRow = collections.namedtuple(
         "cells",
     ),
 )
+
+ItemWithLineNum = Union[Keyword, RawLine, Property, ListItem, tuple[int, Any]]
+def offset_linenum(offset: int, item: ItemWithLineNum) -> ItemWithLineNum:
+    if isinstance(item, tuple) and len(item) == 2 and isinstance(item[0], int):
+        return item
+
+    if isinstance(item, ListItem):
+        item.linenum += offset
+        return item
+
+    assert isinstance(item, (Keyword, RawLine, Property)), \
+        "Expected (Keyword|RawLine|Property), found {}".format(item)
+    return item._replace(linenum=item.linenum + offset)
 
 
 # @TODO How are [YYYY-MM-DD HH:mm--HH:mm] and ([... HH:mm]--[... HH:mm]) differentiated ?
@@ -2258,6 +2291,7 @@ class OrgDoc:
         self.headlines: List[Headline] = list(
             map(lambda hl: parse_headline(hl, self, self), headlines)
         )
+        self.environment = environment
 
     @property
     def id(self):
