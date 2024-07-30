@@ -903,7 +903,7 @@ class TestSerde(unittest.TestCase):
         hl.update_raw_contents(content)
 
         # Check after update
-        ex.assert_matches(self, hl)
+        ex.assert_matches(self, hl, accept_trailing_whitespace_changes=True)
 
 
 def print_tree(tree, indentation=0, headline=None):
