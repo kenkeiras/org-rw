@@ -1,7 +1,18 @@
 import uuid
 
-from .org_rw import (Bold, Code, Headline, Italic, Line, RawLine, ListItem, Strike, Text,
-                     Underlined, Verbatim)
+from .org_rw import (
+    Bold,
+    Code,
+    Headline,
+    Italic,
+    Line,
+    RawLine,
+    ListItem,
+    Strike,
+    Text,
+    Underlined,
+    Verbatim,
+)
 
 from .org_rw import dump_contents
 

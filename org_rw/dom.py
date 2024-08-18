@@ -41,10 +41,11 @@ class ListGroupNode:
         self.children.append(child)
 
     def get_raw(self):
-        return '\n'.join([c.get_raw() for c in self.children])
+        return "\n".join([c.get_raw() for c in self.children])
 
     def __repr__(self):
         return "<List: {}>".format(len(self.children))
+
 
 class TableNode:
     def __init__(self):
@@ -56,21 +57,24 @@ class TableNode:
     def __repr__(self):
         return "<Table: {}>".format(len(self.children))
 
+
 class TableSeparatorRow:
     def __init__(self, orig=None):
         self.orig = orig
+
 
 class TableRow:
     def __init__(self, cells, orig=None):
         self.cells = cells
         self.orig = orig
 
+
 class Text:
     def __init__(self, content):
         self.content = content
 
     def get_raw(self):
-        return ''.join(self.content.get_raw())
+        return "".join(self.content.get_raw())
 
 
 class ListItem:
@@ -105,21 +109,24 @@ class CodeBlock(BlockNode):
     def __repr__(self):
         return "<Code: {}>".format(len(self.lines or []))
 
-DomNode = Union[DrawerNode,
-                PropertyNode,
-                ListGroupNode,
-                TableNode,
-                TableSeparatorRow,
-                TableRow,
-                Text,
-                ListItem,
-                BlockNode,
-                ]
 
-ContainerDomNode = Union[DrawerNode,
-                         ListGroupNode,
-                         TableNode,
-                         BlockNode,
-                         ]
+DomNode = Union[
+    DrawerNode,
+    PropertyNode,
+    ListGroupNode,
+    TableNode,
+    TableSeparatorRow,
+    TableRow,
+    Text,
+    ListItem,
+    BlockNode,
+]
+
+ContainerDomNode = Union[
+    DrawerNode,
+    ListGroupNode,
+    TableNode,
+    BlockNode,
+]
 
 from .utils import get_raw_contents
