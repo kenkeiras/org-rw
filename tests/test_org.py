@@ -2,9 +2,6 @@ import os
 import unittest
 from datetime import datetime as DT
 
-from org_rw import MarkerToken, MarkerType, Timestamp, dumps, load, loads, dom
-import org_rw
-
 from utils.assertions import (
     BOLD,
     CODE,
@@ -18,6 +15,9 @@ from utils.assertions import (
     Doc,
     Tokens,
 )
+
+import org_rw
+from org_rw import MarkerToken, MarkerType, Timestamp, dom, dumps, load, loads
 
 DIR = os.path.dirname(os.path.abspath(__file__))
 

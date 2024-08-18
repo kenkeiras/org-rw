@@ -6,15 +6,14 @@ from .org_rw import (
     Headline,
     Italic,
     Line,
-    RawLine,
     ListItem,
+    RawLine,
     Strike,
     Text,
     Underlined,
     Verbatim,
+    dump_contents,
 )
-
-from .org_rw import dump_contents
 
 
 def get_hl_raw_contents(doc: Headline) -> str:

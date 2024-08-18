@@ -1,6 +1,5 @@
 from __future__ import annotations
-from typing import Dict, Optional, TextIO
-from datetime import timedelta
+
 import collections
 import difflib
 import logging
@@ -9,12 +8,21 @@ import re
 import sys
 from datetime import date, datetime, timedelta
 from enum import Enum
-from typing import cast, Iterator, List, Literal, Optional, Tuple, TypedDict, Union
-
-from .types import HeadlineDict
+from typing import (
+    Dict,
+    Iterator,
+    List,
+    Literal,
+    Optional,
+    TextIO,
+    Tuple,
+    TypedDict,
+    Union,
+    cast,
+)
 
 from . import dom
-
+from .types import HeadlineDict
 
 DEBUG_DIFF_CONTEXT = 10
 
