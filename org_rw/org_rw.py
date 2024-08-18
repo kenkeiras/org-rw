@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import Optional
+from typing import Dict, Optional, TextIO
 from datetime import timedelta
 import collections
 import difflib
@@ -23,7 +23,9 @@ DEFAULT_DONE_KEYWORDS = ["DONE"]
 
 BASE_ENVIRONMENT = {
     "org-footnote-section": "Footnotes",
-    "org-todo-keywords": ' '.join(DEFAULT_TODO_KEYWORDS) + ' | ' + ' '.join(DEFAULT_DONE_KEYWORDS),
+    "org-todo-keywords": " ".join(DEFAULT_TODO_KEYWORDS)
+    + " | "
+    + " ".join(DEFAULT_DONE_KEYWORDS),
     "org-options-keywords": (
         "ARCHIVE:",
         "AUTHOR:",
@@ -115,10 +117,12 @@ NON_FINISHED_GROUPS = (
 )
 FREE_GROUPS = (dom.CodeBlock,)
 
+
 # States
 class HeadlineState(TypedDict):
     # To be extended to handle keyboard shortcuts
     name: str
+
 
 class OrgDocDeclaredStates(TypedDict):
     not_completed: List[HeadlineState]
@@ -1094,7 +1098,9 @@ class Timestamp:
             datetime: The corresponding datetime object.
         """
         if self.hour is not None:
-            return datetime(self.year, self.month, self.day, self.hour, self.minute or 0)
+            return datetime(
+                self.year, self.month, self.day, self.hour, self.minute or 0
+            )
         else:
             return datetime(self.year, self.month, self.day, 0, 0)
 
@@ -1493,7 +1499,6 @@ class OrgTime:
         """
         return self.time.active
 
-
     @active.setter
     def active(self, value: bool) -> None:
         """
@@ -1668,7 +1673,7 @@ class Text:
     def __repr__(self):
         return "{{Text line: {}; content: {} }}".format(self.linenum, self.contents)
 
-    def get_text(self):
+    def get_text(self) -> str:
         return token_list_to_plaintext(self.contents)
 
     def get_raw(self):
@@ -1991,7 +1996,7 @@ def parse_contents(raw_contents: List[RawLine]):
     return [parse_content_block(block) for block in blocks]
 
 
-def parse_content_block(raw_contents: Union[List[RawLine], str]):
+def parse_content_block(raw_contents: Union[List[RawLine], str]) -> Text:
     contents_buff = []
     if isinstance(raw_contents, str):
         contents_buff.append(raw_contents)
@@ -2077,16 +2082,16 @@ def parse_headline(hl, doc, parent) -> Headline:
     title = line
     is_done = is_todo = False
     for state in doc.todo_keywords or []:
-        if title.startswith(state['name'] + " "):
+        if title.startswith(state["name"] + " "):
             hl_state = state
-            title = title[len(state['name'] + " ") :]
+            title = title[len(state["name"] + " ") :]
             is_todo = True
             break
     else:
         for state in doc.done_keywords or []:
-            if title.startswith(state['name'] + " "):
+            if title.startswith(state["name"] + " "):
                 hl_state = state
-                title = title[len(state['name'] + " ") :]
+                title = title[len(state["name"] + " ") :]
                 is_done = True
                 break
 
@@ -2185,7 +2190,7 @@ def dump_delimiters(line: DelimiterLine):
 
 def parse_todo_done_keywords(line: str) -> OrgDocDeclaredStates:
     clean_line = re.sub(r"\([^)]+\)", "", line)
-    if '|' in clean_line:
+    if "|" in clean_line:
         todo_kws, done_kws = clean_line.split("|", 1)
         has_split = True
     else:
@@ -2200,20 +2205,20 @@ def parse_todo_done_keywords(line: str) -> OrgDocDeclaredStates:
         todo_keywords = todo_keywords[:-1]
 
     return {
-        "not_completed": [
-            HeadlineState(name=keyword)
-            for keyword in todo_keywords
-        ],
-        "completed": [
-            HeadlineState(name=keyword)
-            for keyword in done_keywords
-        ],
+        "not_completed": [HeadlineState(name=keyword) for keyword in todo_keywords],
+        "completed": [HeadlineState(name=keyword) for keyword in done_keywords],
     }
 
 
 class OrgDoc:
     def __init__(
-        self, headlines, keywords, contents, list_items, structural, properties,
+        self,
+        headlines,
+        keywords,
+        contents,
+        list_items,
+        structural,
+        properties,
         environment=BASE_ENVIRONMENT,
     ):
         self.todo_keywords = [HeadlineState(name=kw) for kw in DEFAULT_TODO_KEYWORDS]
@@ -2223,13 +2228,19 @@ class OrgDoc:
         for keyword in keywords:
             if keyword.key in ("TODO", "SEQ_TODO"):
                 states = parse_todo_done_keywords(keyword.value)
-                self.todo_keywords, self.done_keywords = states['not_completed'], states['completed']
+                self.todo_keywords, self.done_keywords = (
+                    states["not_completed"],
+                    states["completed"],
+                )
                 keywords_set_in_file = True
 
-        if not keywords_set_in_file and 'org-todo-keywords' in environment:
+        if not keywords_set_in_file and "org-todo-keywords" in environment:
             # Read keywords from environment
-            states = parse_todo_done_keywords(environment['org-todo-keywords'])
-            self.todo_keywords, self.done_keywords = states['not_completed'], states['completed']
+            states = parse_todo_done_keywords(environment["org-todo-keywords"])
+            self.todo_keywords, self.done_keywords = (
+                states["not_completed"],
+                states["completed"],
+            )
 
         self.keywords: List[Property] = keywords
         self.contents: List[RawLine] = contents
@@ -2304,7 +2315,7 @@ class OrgDoc:
 
         state = ""
         if headline.state:
-            state = headline.state['name'] + " "
+            state = headline.state["name"] + " "
 
         raw_title = token_list_to_raw(headline.title.contents)
         tags_padding = ""
@@ -2418,7 +2429,7 @@ class OrgDocReader:
         self.current_drawer: Optional[List] = None
         self.environment = environment
 
-    def finalize(self):
+    def finalize(self) -> OrgDoc:
         return OrgDoc(
             self.headlines,
             self.keywords,
@@ -2724,7 +2735,26 @@ class OrgDocReader:
                 raise
 
 
-def loads(s, environment=BASE_ENVIRONMENT, extra_cautious=True):
+def loads(
+    s: str, environment: Optional[Dict] = BASE_ENVIRONMENT, extra_cautious: bool = True
+) -> OrgDoc:
+    """
+    Load an Org-mode document from a string.
+
+    Args:
+        s (str): The string representation of the Org-mode document.
+        environment (Optional[dict]): The environment for parsing. Defaults to
+            `BASE_ENVIRONMENT`.
+        extra_cautious (bool): If True, perform an extra check to ensure that
+            the document can be re-serialized to the original string. Defaults to True.
+
+    Returns:
+        OrgDoc: The loaded Org-mode document.
+
+    Raises:
+        NonReproducibleDocument: If `extra_cautious` is True and there is a
+            difference between the original string and the re-serialized document.
+    """
     reader = OrgDocReader(environment)
     reader.read(s)
     doc = reader.finalize()
@@ -2764,20 +2794,55 @@ def loads(s, environment=BASE_ENVIRONMENT, extra_cautious=True):
     return doc
 
 
-def load(f, environment=BASE_ENVIRONMENT, extra_cautious=False):
+def load(
+    f: TextIO,
+    environment: Optional[dict] = BASE_ENVIRONMENT,
+    extra_cautious: bool = False,
+) -> OrgDoc:
+    """
+    Load an Org-mode document from a file object.
+
+    Args:
+        f (TextIO): The file object containing the Org-mode document.
+        environment (Optional[dict]): The environment for parsing. Defaults to
+            `BASE_ENVIRONMENT`.
+        extra_cautious (bool): If True, perform an extra check to ensure that
+            the document can be re-serialized to the original string. Defaults to False.
+
+    Returns:
+        OrgDoc: The loaded Org-mode document.
+    """
     doc = loads(f.read(), environment, extra_cautious)
     doc._path = os.path.abspath(f.name)
     return doc
 
 
-def dumps(doc):
+def dumps(doc: OrgDoc) -> str:
+    """
+    Serialize an OrgDoc object to a string.
+
+    Args:
+        doc (OrgDoc): The OrgDoc object to serialize.
+
+    Returns:
+        str: The serialized string representation of the OrgDoc object.
+    """
     dump = list(doc.dump())
     result = "\n".join(dump)
-    # print(result)
     return result
 
 
-def dump(doc, fp):
+def dump(doc: OrgDoc, fp: TextIO) -> None:
+    """
+    Serialize an OrgDoc object to a file.
+
+    Args:
+        doc (OrgDoc): The OrgDoc object to serialize.
+        fp (TextIO): The file-like object to write the serialized data to.
+
+    Returns:
+        None
+    """
     it = doc.dump()
 
     # Write first line separately
