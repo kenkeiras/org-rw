@@ -2,9 +2,6 @@ import os
 import unittest
 from datetime import datetime as DT
 
-from org_rw import MarkerToken, MarkerType, Timestamp, dumps, load, loads, dom
-import org_rw
-
 from utils.assertions import (
     BOLD,
     CODE,
@@ -18,6 +15,9 @@ from utils.assertions import (
     Doc,
     Tokens,
 )
+
+import org_rw
+from org_rw import MarkerToken, MarkerType, Timestamp, dom, dumps, load, loads
 
 DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -834,12 +834,12 @@ class TestSerde(unittest.TestCase):
         self.assertEqual(dumps(doc), orig)
 
     def test_add_todo_keywords_programatically(self):
-        orig = '''* NEW_TODO_STATE First entry
+        orig = """* NEW_TODO_STATE First entry
 
-* NEW_DONE_STATE Second entry'''
-        doc = loads(orig, environment={
-            'org-todo-keywords': "NEW_TODO_STATE | NEW_DONE_STATE"
-        })
+* NEW_DONE_STATE Second entry"""
+        doc = loads(
+            orig, environment={"org-todo-keywords": "NEW_TODO_STATE | NEW_DONE_STATE"}
+        )
         self.assertEqual(doc.headlines[0].is_todo, True)
         self.assertEqual(doc.headlines[0].is_done, False)
 
@@ -849,14 +849,14 @@ class TestSerde(unittest.TestCase):
         self.assertEqual(dumps(doc), orig)
 
     def test_add_todo_keywords_in_file(self):
-        orig = '''#+TODO: NEW_TODO_STATE | NEW_DONE_STATE
+        orig = """#+TODO: NEW_TODO_STATE | NEW_DONE_STATE
 
 * NEW_TODO_STATE First entry
 
-* NEW_DONE_STATE Second entry'''
-        doc = loads(orig, environment={
-            'org-todo-keywords': "NEW_TODO_STATE | NEW_DONE_STATE"
-        })
+* NEW_DONE_STATE Second entry"""
+        doc = loads(
+            orig, environment={"org-todo-keywords": "NEW_TODO_STATE | NEW_DONE_STATE"}
+        )
         self.assertEqual(doc.headlines[0].is_todo, True)
         self.assertEqual(doc.headlines[0].is_done, False)
 

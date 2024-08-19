@@ -1,7 +1,9 @@
 """Test the Timestamp object."""
 
-import pytest
 from datetime import date, datetime
+
+import pytest
+
 from org_rw import Timestamp
 
 
