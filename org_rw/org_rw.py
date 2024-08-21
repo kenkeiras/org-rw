@@ -1911,7 +1911,12 @@ def tokenize_contents(contents: str) -> List[TokenItems]:
                         continue
 
         # Possible link close or open of description
-        if char == "]" and len(contents) > i + 1 and in_link and contents[i + 1] in "][":
+        if (
+            char == "]"
+            and len(contents) > i + 1
+            and in_link
+            and contents[i + 1] in "]["
+        ):
             if contents[i + 1] == "]":
                 cut_string()
 
