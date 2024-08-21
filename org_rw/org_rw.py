@@ -1962,6 +1962,7 @@ def tokenize_contents(contents: str) -> List[TokenItems]:
             cut_string()
             tokens.append((TOKEN_TYPE_CLOSE_MARKER, char))
             has_changed = True
+            closes.remove(i)
 
         if not has_changed:
             text.append(char)
