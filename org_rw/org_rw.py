@@ -752,8 +752,13 @@ class Headline:
         return times
 
     @property
-    def tags(self):
-        return list(self.shallow_tags) + self.parent.tags
+    def tags(self) -> list[str]:
+        parent_tags = self.parent.tags
+        if self.doc.environment.get('org-tags-exclude-from-inheritance'):
+            for tag in self.doc.environment.get('org-tags-exclude-from-inheritance'):
+                if tag in parent_tags:
+                    parent_tags.remove(tag)
+        return list(self.shallow_tags) + parent_tags
 
     def add_tag(self, tag: str):
         self.shallow_tags.append(tag)
@@ -2234,6 +2239,7 @@ class OrgDoc:
     ):
         self.todo_keywords = [HeadlineState(name=kw) for kw in DEFAULT_TODO_KEYWORDS]
         self.done_keywords = [HeadlineState(name=kw) for kw in DEFAULT_DONE_KEYWORDS]
+        self.environment = environment
 
         keywords_set_in_file = False
         for keyword in keywords:
