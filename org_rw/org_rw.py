@@ -103,7 +103,7 @@ PLANNING_RE = re.compile(
     r")+\s*"
 )
 LIST_ITEM_RE = re.compile(
-    r"(?P<indentation>\s*)((?P<bullet>[*\-+])|((?P<counter>\d|[a-zA-Z])(?P<counter_sep>[.)]))) ((?P<checkbox_indentation>\s*)\[(?P<checkbox_value>[ Xx])\])?((?P<tag_indentation>\s*)(?P<tag>.*?)::)?(?P<content>.*)"
+    r"(?P<indentation>\s*)((?P<bullet>[*\-+])|((?P<counter>\d|[a-zA-Z])(?P<counter_sep>[.)]))) ((?P<checkbox_indentation>\s*)\[(?P<checkbox_value>[ Xx])\])?((?P<tag_indentation>\s*)((?P<tag>.*?)\s::))?(?P<content>.*)"
 )
 
 IMPLICIT_LINK_RE = re.compile(r"(https?:[^<> ]*[a-zA-Z0-9])")
@@ -1911,7 +1911,12 @@ def tokenize_contents(contents: str) -> List[TokenItems]:
                         continue
 
         # Possible link close or open of description
-        if char == "]" and len(contents) > i + 1 and in_link:
+        if (
+            char == "]"
+            and len(contents) > i + 1
+            and in_link
+            and contents[i + 1] in "]["
+        ):
             if contents[i + 1] == "]":
                 cut_string()
 
@@ -1962,6 +1967,7 @@ def tokenize_contents(contents: str) -> List[TokenItems]:
             cut_string()
             tokens.append((TOKEN_TYPE_CLOSE_MARKER, char))
             has_changed = True
+            closes.remove(i)
 
         if not has_changed:
             text.append(char)
@@ -2052,7 +2058,7 @@ def dump_contents(raw):
         content = "\n".join(content_lines)
         checkbox = f"[{raw.checkbox_value}]" if raw.checkbox_value else ""
         tag = (
-            f"{raw.tag_indentation}{token_list_to_raw(raw.tag or '')}::"
+            f"{raw.tag_indentation}{token_list_to_raw(raw.tag or '')} ::"
             if raw.tag or raw.tag_indentation
             else ""
         )
