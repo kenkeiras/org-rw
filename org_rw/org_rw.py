@@ -753,10 +753,7 @@ class Headline:
 
     @property
     def tags(self):
-        if isinstance(self.parent, OrgDoc):
-            return list(self.shallow_tags)
-        else:
-            return list(self.shallow_tags) + self.parent.tags
+        return list(self.shallow_tags) + self.parent.tags
 
     def add_tag(self, tag: str):
         self.shallow_tags.append(tag)
@@ -2279,6 +2276,13 @@ class OrgDoc:
     @property
     def path(self):
         return self._path
+
+    @property
+    def tags(self) -> list[str]:
+        for kw in self.keywords:
+            if kw.key == "FILETAGS":
+                return kw.value.strip(':').split(':')
+        return []
 
     ## Querying
     def get_links(self):
