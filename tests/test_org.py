@@ -877,73 +877,80 @@ class TestSerde(unittest.TestCase):
             orig = f.read()
             doc = loads(orig)
 
-        self.assertEqual(doc.tags, ['filetag'])
+        self.assertEqual(doc.tags, ["filetag"])
 
         h1_1, h1_2 = doc.getTopHeadlines()
-        self.assertEqual(sorted(h1_1.tags), ['filetag', 'h1tag'])
-        self.assertEqual(sorted(h1_2.tags), ['filetag', 'otherh1tag'])
+        self.assertEqual(sorted(h1_1.tags), ["filetag", "h1tag"])
+        self.assertEqual(sorted(h1_2.tags), ["filetag", "otherh1tag"])
 
         h1_1_h2 = h1_1.children[0]
-        self.assertEqual(sorted(h1_1_h2.tags), ['filetag', 'h1tag', 'h2tag'])
+        self.assertEqual(sorted(h1_1_h2.tags), ["filetag", "h1tag", "h2tag"])
 
         h1_2_h2 = h1_2.children[0]
-        self.assertEqual(sorted(h1_2_h2.tags), ['filetag', 'otherh1tag', 'otherh2tag'])
+        self.assertEqual(sorted(h1_2_h2.tags), ["filetag", "otherh1tag", "otherh2tag"])
 
     def test_shallow_tag_property_read_13(self):
         with open(os.path.join(DIR, "13-tags.org")) as f:
             orig = f.read()
             doc = loads(orig)
 
-        self.assertEqual(doc.shallow_tags, ['filetag'])
+        self.assertEqual(doc.shallow_tags, ["filetag"])
 
         h1_1, h1_2 = doc.getTopHeadlines()
-        self.assertEqual(sorted(h1_1.shallow_tags), ['h1tag'])
-        self.assertEqual(sorted(h1_2.shallow_tags), ['otherh1tag'])
+        self.assertEqual(sorted(h1_1.shallow_tags), ["h1tag"])
+        self.assertEqual(sorted(h1_2.shallow_tags), ["otherh1tag"])
 
         h1_1_h2 = h1_1.children[0]
-        self.assertEqual(sorted(h1_1_h2.shallow_tags), ['h2tag'])
+        self.assertEqual(sorted(h1_1_h2.shallow_tags), ["h2tag"])
 
         h1_2_h2 = h1_2.children[0]
-        self.assertEqual(sorted(h1_2_h2.shallow_tags), ['otherh2tag'])
+        self.assertEqual(sorted(h1_2_h2.shallow_tags), ["otherh2tag"])
 
     def test_exclude_tags_from_inheritance_property_read_13(self):
         with open(os.path.join(DIR, "13-tags.org")) as f:
             orig = f.read()
-            doc = loads(orig, {
-                'org-tags-exclude-from-inheritance': ('h1tag', 'otherh2tag'),
-            })
+            doc = loads(
+                orig,
+                {
+                    "org-tags-exclude-from-inheritance": ("h1tag", "otherh2tag"),
+                },
+            )
 
-        self.assertEqual(doc.tags, ['filetag'])
+        self.assertEqual(doc.tags, ["filetag"])
 
         h1_1, h1_2 = doc.getTopHeadlines()
-        self.assertEqual(sorted(h1_1.tags), ['filetag', 'h1tag'])
-        self.assertEqual(sorted(h1_2.tags), ['filetag', 'otherh1tag'])
+        self.assertEqual(sorted(h1_1.tags), ["filetag", "h1tag"])
+        self.assertEqual(sorted(h1_2.tags), ["filetag", "otherh1tag"])
 
         h1_1_h2 = h1_1.children[0]
-        self.assertEqual(sorted(h1_1_h2.tags), ['filetag', 'h2tag'])
+        self.assertEqual(sorted(h1_1_h2.tags), ["filetag", "h2tag"])
 
         h1_2_h2 = h1_2.children[0]
-        self.assertEqual(sorted(h1_2_h2.tags), ['filetag', 'otherh1tag', 'otherh2tag'])
+        self.assertEqual(sorted(h1_2_h2.tags), ["filetag", "otherh1tag", "otherh2tag"])
 
     def test_select_tags_to_inheritance_property_read_13(self):
         with open(os.path.join(DIR, "13-tags.org")) as f:
             orig = f.read()
-            doc = loads(orig, {
-                'org-tags-exclude-from-inheritance': ('h1tag', 'otherh2tag'),
-                'org-use-tag-inheritance': ('h1tag',),
-            })
+            doc = loads(
+                orig,
+                {
+                    "org-tags-exclude-from-inheritance": ("h1tag", "otherh2tag"),
+                    "org-use-tag-inheritance": ("h1tag",),
+                },
+            )
 
-        self.assertEqual(doc.tags, ['filetag'])
+        self.assertEqual(doc.tags, ["filetag"])
 
         h1_1, h1_2 = doc.getTopHeadlines()
-        self.assertEqual(sorted(h1_1.tags), ['h1tag'])
-        self.assertEqual(sorted(h1_2.tags), ['otherh1tag'])
+        self.assertEqual(sorted(h1_1.tags), ["h1tag"])
+        self.assertEqual(sorted(h1_2.tags), ["otherh1tag"])
 
         h1_1_h2 = h1_1.children[0]
-        self.assertEqual(sorted(h1_1_h2.tags), ['h1tag', 'h2tag'])
+        self.assertEqual(sorted(h1_1_h2.tags), ["h1tag", "h2tag"])
 
         h1_2_h2 = h1_2.children[0]
-        self.assertEqual(sorted(h1_2_h2.tags), ['otherh2tag'])
+        self.assertEqual(sorted(h1_2_h2.tags), ["otherh2tag"])
+
 
 def print_tree(tree, indentation=0, headline=None):
     for element in tree:

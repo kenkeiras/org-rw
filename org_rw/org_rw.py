@@ -754,15 +754,15 @@ class Headline:
     @property
     def tags(self) -> list[str]:
         parent_tags = self.parent.tags
-        if self.doc.environment.get('org-use-tag-inheritance'):
+        if self.doc.environment.get("org-use-tag-inheritance"):
             accepted_tags = []
-            for tag in self.doc.environment.get('org-use-tag-inheritance'):
+            for tag in self.doc.environment.get("org-use-tag-inheritance"):
                 if tag in parent_tags:
                     accepted_tags.append(tag)
             parent_tags = accepted_tags
 
-        elif self.doc.environment.get('org-tags-exclude-from-inheritance'):
-            for tag in self.doc.environment.get('org-tags-exclude-from-inheritance'):
+        elif self.doc.environment.get("org-tags-exclude-from-inheritance"):
+            for tag in self.doc.environment.get("org-tags-exclude-from-inheritance"):
                 if tag in parent_tags:
                     parent_tags.remove(tag)
         return list(self.shallow_tags) + parent_tags
@@ -2294,7 +2294,7 @@ class OrgDoc:
     def tags(self) -> list[str]:
         for kw in self.keywords:
             if kw.key == "FILETAGS":
-                return kw.value.strip(':').split(':')
+                return kw.value.strip(":").split(":")
         return []
 
     @property
