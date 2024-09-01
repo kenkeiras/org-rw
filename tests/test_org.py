@@ -865,6 +865,29 @@ class TestSerde(unittest.TestCase):
 
         self.assertEqual(dumps(doc), orig)
 
+    def test_mimic_write_file_13(self):
+        with open(os.path.join(DIR, "13-tags.org")) as f:
+            orig = f.read()
+            doc = loads(orig)
+
+        self.assertEqual(dumps(doc), orig)
+
+    def test_tag_property_read_13(self):
+        with open(os.path.join(DIR, "13-tags.org")) as f:
+            orig = f.read()
+            doc = loads(orig)
+
+        self.assertEqual(doc.tags, ['filetag'])
+
+        h1_1, h1_2 = doc.getTopHeadlines()
+        self.assertEqual(sorted(h1_1.tags), ['filetag', 'h1tag'])
+        self.assertEqual(sorted(h1_2.tags), ['filetag', 'otherh1tag'])
+
+        h1_1_h2 = h1_1.children[0]
+        self.assertEqual(sorted(h1_1_h2.tags), ['filetag', 'h1tag', 'h2tag'])
+
+        h1_2_h2 = h1_2.children[0]
+        self.assertEqual(sorted(h1_2_h2.tags), ['filetag', 'otherh1tag', 'otherh2tag'])
 
 def print_tree(tree, indentation=0, headline=None):
     for element in tree:
