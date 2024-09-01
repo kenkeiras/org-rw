@@ -2284,6 +2284,10 @@ class OrgDoc:
                 return kw.value.strip(':').split(':')
         return []
 
+    @property
+    def shallow_tags(self) -> list[str]:
+        return self.tags
+
     ## Querying
     def get_links(self):
         for headline in self.headlines:
