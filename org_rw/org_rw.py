@@ -754,7 +754,14 @@ class Headline:
     @property
     def tags(self) -> list[str]:
         parent_tags = self.parent.tags
-        if self.doc.environment.get('org-tags-exclude-from-inheritance'):
+        if self.doc.environment.get('org-use-tag-inheritance'):
+            accepted_tags = []
+            for tag in self.doc.environment.get('org-use-tag-inheritance'):
+                if tag in parent_tags:
+                    accepted_tags.append(tag)
+            parent_tags = accepted_tags
+
+        elif self.doc.environment.get('org-tags-exclude-from-inheritance'):
             for tag in self.doc.environment.get('org-tags-exclude-from-inheritance'):
                 if tag in parent_tags:
                     parent_tags.remove(tag)
