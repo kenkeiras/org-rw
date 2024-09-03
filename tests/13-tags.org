@@ -1,0 +1,13 @@
+#+TITLE: 13-Tags
+#+DESCRIPTION: Simple org file to test tags
+#+FILETAGS: :filetag:
+
+* Level 1 :h1tag:
+  :PROPERTIES:
+  :ID:       13-tags
+  :CREATED:  [2020-01-01 Wed 01:01]
+  :END:
+
+** Level2 :h2tag:
+* Level 1-1 :otherh1tag:
+** Level2 :otherh2tag:

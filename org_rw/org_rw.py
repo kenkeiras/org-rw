@@ -752,11 +752,20 @@ class Headline:
         return times
 
     @property
-    def tags(self):
-        if isinstance(self.parent, OrgDoc):
-            return list(self.shallow_tags)
-        else:
-            return list(self.shallow_tags) + self.parent.tags
+    def tags(self) -> list[str]:
+        parent_tags = self.parent.tags
+        if self.doc.environment.get("org-use-tag-inheritance"):
+            accepted_tags = []
+            for tag in self.doc.environment.get("org-use-tag-inheritance"):
+                if tag in parent_tags:
+                    accepted_tags.append(tag)
+            parent_tags = accepted_tags
+
+        elif self.doc.environment.get("org-tags-exclude-from-inheritance"):
+            for tag in self.doc.environment.get("org-tags-exclude-from-inheritance"):
+                if tag in parent_tags:
+                    parent_tags.remove(tag)
+        return list(self.shallow_tags) + parent_tags
 
     def add_tag(self, tag: str):
         self.shallow_tags.append(tag)
@@ -2237,6 +2246,7 @@ class OrgDoc:
     ):
         self.todo_keywords = [HeadlineState(name=kw) for kw in DEFAULT_TODO_KEYWORDS]
         self.done_keywords = [HeadlineState(name=kw) for kw in DEFAULT_DONE_KEYWORDS]
+        self.environment = environment
 
         keywords_set_in_file = False
         for keyword in keywords:
@@ -2279,6 +2289,17 @@ class OrgDoc:
     @property
     def path(self):
         return self._path
+
+    @property
+    def tags(self) -> list[str]:
+        for kw in self.keywords:
+            if kw.key == "FILETAGS":
+                return kw.value.strip(":").split(":")
+        return []
+
+    @property
+    def shallow_tags(self) -> list[str]:
+        return self.tags
 
     ## Querying
     def get_links(self):
