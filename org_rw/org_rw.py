@@ -113,7 +113,7 @@ BEGIN_BLOCK_RE = re.compile(r"^\s*#\+BEGIN_(?P<subtype>[^ ]+)(?P<arguments>.*)$"
 END_BLOCK_RE = re.compile(r"^\s*#\+END_(?P<subtype>[^ ]+)\s*$", re.I)
 RESULTS_DRAWER_RE = re.compile(r"^\s*:results:\s*$", re.I)
 CodeSnippet = collections.namedtuple(
-    "CodeSnippet", ("name", "content", "result", "arguments")
+    "CodeSnippet", ("name", "content", "result", "language", "arguments")
 )
 
 # Groupings
@@ -916,12 +916,22 @@ class Headline:
                     # the content parsing must be re-thinked
                     contents = contents[:-1]
 
+                language = None
+                if arguments is not None:
+                    arguments = arguments.strip()
+                    if " " in arguments:
+                        language = arguments[: arguments.index(" ")]
+                        arguments = arguments[arguments.index(" ") + 1 :]
+                    else:
+                        language = arguments
+                        arguments = None
                 sections.append(
                     {
                         "line_first": start + 1,
                         "line_last": end - 1,
                         "content": contents,
                         "arguments": arguments,
+                        "language": language,
                         "name": name,
                     }
                 )
@@ -977,12 +987,14 @@ class Headline:
             content = section["content"]
             code_result = section.get("result", None)
             arguments = section.get("arguments", None)
+            language = section.get("language", None)
             name = section.get("name", None)
             results.append(
                 CodeSnippet(
                     content=content,
                     result=code_result,
                     arguments=arguments,
+                    language=language,
                     name=name,
                 )
             )

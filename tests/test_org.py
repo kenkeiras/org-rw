@@ -481,6 +481,7 @@ class TestSerde(unittest.TestCase):
         snippets = list(doc.get_code_snippets())
         self.assertEqual(len(snippets), 3)
         self.assertEqual(snippets[0].name, "first-code-name")
+        self.assertEqual(snippets[0].language, "shell")
         self.assertEqual(
             snippets[0].content,
             'echo "This is a test"\n'
@@ -488,7 +489,7 @@ class TestSerde(unittest.TestCase):
             + "exit 0 # Exit successfully",
         )
         self.assertEqual(
-            snippets[0].arguments.split(), ["shell", ":results", "verbatim"]
+            snippets[0].arguments.split(), [":results", "verbatim"]
         )
         self.assertEqual(
             snippets[0].result,
@@ -496,6 +497,7 @@ class TestSerde(unittest.TestCase):
         )
 
         self.assertEqual(snippets[1].name, None)
+        self.assertEqual(snippets[1].language, "shell")
         self.assertEqual(
             snippets[1].content,
             'echo "This is another test"\n'
@@ -507,6 +509,7 @@ class TestSerde(unittest.TestCase):
         )
 
         self.assertEqual(snippets[2].name, None)
+        self.assertEqual(snippets[2].language, "c")
         self.assertEqual(
             snippets[2].content,
             "/* This code has to be escaped to\n"
