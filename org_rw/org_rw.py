@@ -882,6 +882,12 @@ class Headline:
         sections = []
         arguments = None
 
+        names_by_line = {}
+        for kw in self.keywords:
+            if kw.key == "NAME":
+                names_by_line[kw.linenum] = kw.value
+
+        name = None
         for delimiter in self.delimiters:
             if (
                 delimiter.delimiter_type == DelimiterLineType.BEGIN_BLOCK
@@ -890,6 +896,12 @@ class Headline:
                 line_start = delimiter.linenum
                 inside_code = True
                 arguments = delimiter.arguments
+
+                name_line = line_start - 1
+                if name_line in names_by_line:
+                    name = names_by_line[name_line]
+                else:
+                    name = None
             elif (
                 delimiter.delimiter_type == DelimiterLineType.END_BLOCK
                 and delimiter.type_data.subtype.lower() == "src"
@@ -910,8 +922,10 @@ class Headline:
                         "line_last": end - 1,
                         "content": contents,
                         "arguments": arguments,
+                        "name": name,
                     }
                 )
+                name = None
                 arguments = None
                 line_start = None
 
@@ -960,13 +974,16 @@ class Headline:
 
         results = []
         for section in sections:
-            name = None
             content = section["content"]
             code_result = section.get("result", None)
             arguments = section.get("arguments", None)
+            name = section.get("name", None)
             results.append(
                 CodeSnippet(
-                    name=name, content=content, result=code_result, arguments=arguments
+                    content=content,
+                    result=code_result,
+                    arguments=arguments,
+                    name=name,
                 )
             )
 
