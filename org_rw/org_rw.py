@@ -2338,7 +2338,7 @@ class OrgDoc:
             yield hl
 
     def get_code_snippets(self):
-        for headline in self.headlines:
+        for headline in self.getAllHeadlines():
             yield from headline.get_code_snippets()
 
     # Writing
