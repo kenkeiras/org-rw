@@ -113,7 +113,7 @@ BEGIN_BLOCK_RE = re.compile(r"^\s*#\+BEGIN_(?P<subtype>[^ ]+)(?P<arguments>.*)$"
 END_BLOCK_RE = re.compile(r"^\s*#\+END_(?P<subtype>[^ ]+)\s*$", re.I)
 RESULTS_DRAWER_RE = re.compile(r"^\s*:results:\s*$", re.I)
 CodeSnippet = collections.namedtuple(
-    "CodeSnippet", ("name", "content", "result", "arguments")
+    "CodeSnippet", ("name", "content", "result", "language", "arguments")
 )
 
 # Groupings
@@ -882,6 +882,12 @@ class Headline:
         sections = []
         arguments = None
 
+        names_by_line = {}
+        for kw in self.keywords:
+            if kw.key == "NAME":
+                names_by_line[kw.linenum] = kw.value
+
+        name = None
         for delimiter in self.delimiters:
             if (
                 delimiter.delimiter_type == DelimiterLineType.BEGIN_BLOCK
@@ -890,6 +896,12 @@ class Headline:
                 line_start = delimiter.linenum
                 inside_code = True
                 arguments = delimiter.arguments
+
+                name_line = line_start - 1
+                if name_line in names_by_line:
+                    name = names_by_line[name_line]
+                else:
+                    name = None
             elif (
                 delimiter.delimiter_type == DelimiterLineType.END_BLOCK
                 and delimiter.type_data.subtype.lower() == "src"
@@ -904,14 +916,26 @@ class Headline:
                     # the content parsing must be re-thinked
                     contents = contents[:-1]
 
+                language = None
+                if arguments is not None:
+                    arguments = arguments.strip()
+                    if " " in arguments:
+                        language = arguments[: arguments.index(" ")]
+                        arguments = arguments[arguments.index(" ") + 1 :]
+                    else:
+                        language = arguments
+                        arguments = None
                 sections.append(
                     {
                         "line_first": start + 1,
                         "line_last": end - 1,
                         "content": contents,
                         "arguments": arguments,
+                        "language": language,
+                        "name": name,
                     }
                 )
+                name = None
                 arguments = None
                 line_start = None
 
@@ -960,13 +984,18 @@ class Headline:
 
         results = []
         for section in sections:
-            name = None
             content = section["content"]
             code_result = section.get("result", None)
             arguments = section.get("arguments", None)
+            language = section.get("language", None)
+            name = section.get("name", None)
             results.append(
                 CodeSnippet(
-                    name=name, content=content, result=code_result, arguments=arguments
+                    content=content,
+                    result=code_result,
+                    arguments=arguments,
+                    language=language,
+                    name=name,
                 )
             )
 
@@ -2338,7 +2367,7 @@ class OrgDoc:
             yield hl
 
     def get_code_snippets(self):
-        for headline in self.headlines:
+        for headline in self.getAllHeadlines():
             yield from headline.get_code_snippets()
 
     # Writing

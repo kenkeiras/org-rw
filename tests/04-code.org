@@ -9,6 +9,7 @@
 :CREATED:  [2020-01-01 Wed 01:01]
 :END:
 
+#+NAME: first-code-name
 #+BEGIN_SRC shell :results verbatim
 echo "This is a test"
 echo "with two lines"
