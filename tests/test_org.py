@@ -3,9 +3,6 @@ import tempfile
 import unittest
 from datetime import datetime as DT
 
-from org_rw import MarkerToken, MarkerType, Timestamp, dumps, load, loads, dom
-import org_rw
-
 from utils.assertions import (
     BOLD,
     CODE,
@@ -19,6 +16,9 @@ from utils.assertions import (
     Doc,
     Tokens,
 )
+
+import org_rw
+from org_rw import MarkerToken, MarkerType, Timestamp, dom, dumps, load, loads
 
 DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -481,20 +481,22 @@ class TestSerde(unittest.TestCase):
 
         snippets = list(doc.get_code_snippets())
         self.assertEqual(len(snippets), 3)
+        self.assertEqual(snippets[0].name, "first-code-name")
+        self.assertEqual(snippets[0].language, "shell")
         self.assertEqual(
             snippets[0].content,
             'echo "This is a test"\n'
             + 'echo "with two lines"\n'
             + "exit 0 # Exit successfully",
         )
-        self.assertEqual(
-            snippets[0].arguments.split(), ["shell", ":results", "verbatim"]
-        )
+        self.assertEqual(snippets[0].arguments.split(), [":results", "verbatim"])
         self.assertEqual(
             snippets[0].result,
             "This is a test\n" + "with two lines",
         )
 
+        self.assertEqual(snippets[1].name, None)
+        self.assertEqual(snippets[1].language, "shell")
         self.assertEqual(
             snippets[1].content,
             'echo "This is another test"\n'
@@ -505,6 +507,8 @@ class TestSerde(unittest.TestCase):
             snippets[1].result, "This is another test\n" + "with two lines too"
         )
 
+        self.assertEqual(snippets[2].name, None)
+        self.assertEqual(snippets[2].language, "c")
         self.assertEqual(
             snippets[2].content,
             "/* This code has to be escaped to\n"
@@ -835,12 +839,12 @@ class TestSerde(unittest.TestCase):
         self.assertEqual(dumps(doc), orig)
 
     def test_add_todo_keywords_programatically(self):
-        orig = '''* NEW_TODO_STATE First entry
+        orig = """* NEW_TODO_STATE First entry
 
-* NEW_DONE_STATE Second entry'''
-        doc = loads(orig, environment={
-            'org-todo-keywords': "NEW_TODO_STATE | NEW_DONE_STATE"
-        })
+* NEW_DONE_STATE Second entry"""
+        doc = loads(
+            orig, environment={"org-todo-keywords": "NEW_TODO_STATE | NEW_DONE_STATE"}
+        )
         self.assertEqual(doc.headlines[0].is_todo, True)
         self.assertEqual(doc.headlines[0].is_done, False)
 
@@ -850,14 +854,14 @@ class TestSerde(unittest.TestCase):
         self.assertEqual(dumps(doc), orig)
 
     def test_add_todo_keywords_in_file(self):
-        orig = '''#+TODO: NEW_TODO_STATE | NEW_DONE_STATE
+        orig = """#+TODO: NEW_TODO_STATE | NEW_DONE_STATE
 
 * NEW_TODO_STATE First entry
 
-* NEW_DONE_STATE Second entry'''
-        doc = loads(orig, environment={
-            'org-todo-keywords': "NEW_TODO_STATE | NEW_DONE_STATE"
-        })
+* NEW_DONE_STATE Second entry"""
+        doc = loads(
+            orig, environment={"org-todo-keywords": "NEW_TODO_STATE | NEW_DONE_STATE"}
+        )
         self.assertEqual(doc.headlines[0].is_todo, True)
         self.assertEqual(doc.headlines[0].is_done, False)
 
@@ -945,6 +949,93 @@ class TestSerde(unittest.TestCase):
                 assert lines[0].startswith('* ')  # Title, skip it
                 content = '\n'.join(lines[1:])
                 self.assertEqual(content, expected_hl_contents)
+
+    def test_mimic_write_file_13(self):
+        with open(os.path.join(DIR, "13-tags.org")) as f:
+            orig = f.read()
+            doc = loads(orig)
+
+        self.assertEqual(dumps(doc), orig)
+
+    def test_tag_property_read_13(self):
+        with open(os.path.join(DIR, "13-tags.org")) as f:
+            orig = f.read()
+            doc = loads(orig)
+
+        self.assertEqual(doc.tags, ["filetag"])
+
+        h1_1, h1_2 = doc.getTopHeadlines()
+        self.assertEqual(sorted(h1_1.tags), ["filetag", "h1tag"])
+        self.assertEqual(sorted(h1_2.tags), ["filetag", "otherh1tag"])
+
+        h1_1_h2 = h1_1.children[0]
+        self.assertEqual(sorted(h1_1_h2.tags), ["filetag", "h1tag", "h2tag"])
+
+        h1_2_h2 = h1_2.children[0]
+        self.assertEqual(sorted(h1_2_h2.tags), ["filetag", "otherh1tag", "otherh2tag"])
+
+    def test_shallow_tag_property_read_13(self):
+        with open(os.path.join(DIR, "13-tags.org")) as f:
+            orig = f.read()
+            doc = loads(orig)
+
+        self.assertEqual(doc.shallow_tags, ["filetag"])
+
+        h1_1, h1_2 = doc.getTopHeadlines()
+        self.assertEqual(sorted(h1_1.shallow_tags), ["h1tag"])
+        self.assertEqual(sorted(h1_2.shallow_tags), ["otherh1tag"])
+
+        h1_1_h2 = h1_1.children[0]
+        self.assertEqual(sorted(h1_1_h2.shallow_tags), ["h2tag"])
+
+        h1_2_h2 = h1_2.children[0]
+        self.assertEqual(sorted(h1_2_h2.shallow_tags), ["otherh2tag"])
+
+    def test_exclude_tags_from_inheritance_property_read_13(self):
+        with open(os.path.join(DIR, "13-tags.org")) as f:
+            orig = f.read()
+            doc = loads(
+                orig,
+                {
+                    "org-tags-exclude-from-inheritance": ("h1tag", "otherh2tag"),
+                },
+            )
+
+        self.assertEqual(doc.tags, ["filetag"])
+
+        h1_1, h1_2 = doc.getTopHeadlines()
+        self.assertEqual(sorted(h1_1.tags), ["filetag", "h1tag"])
+        self.assertEqual(sorted(h1_2.tags), ["filetag", "otherh1tag"])
+
+        h1_1_h2 = h1_1.children[0]
+        self.assertEqual(sorted(h1_1_h2.tags), ["filetag", "h2tag"])
+
+        h1_2_h2 = h1_2.children[0]
+        self.assertEqual(sorted(h1_2_h2.tags), ["filetag", "otherh1tag", "otherh2tag"])
+
+    def test_select_tags_to_inheritance_property_read_13(self):
+        with open(os.path.join(DIR, "13-tags.org")) as f:
+            orig = f.read()
+            doc = loads(
+                orig,
+                {
+                    "org-tags-exclude-from-inheritance": ("h1tag", "otherh2tag"),
+                    "org-use-tag-inheritance": ("h1tag",),
+                },
+            )
+
+        self.assertEqual(doc.tags, ["filetag"])
+
+        h1_1, h1_2 = doc.getTopHeadlines()
+        self.assertEqual(sorted(h1_1.tags), ["h1tag"])
+        self.assertEqual(sorted(h1_2.tags), ["otherh1tag"])
+
+        h1_1_h2 = h1_1.children[0]
+        self.assertEqual(sorted(h1_1_h2.tags), ["h1tag", "h2tag"])
+
+        h1_2_h2 = h1_2.children[0]
+        self.assertEqual(sorted(h1_2_h2.tags), ["otherh2tag"])
+
 
 def print_tree(tree, indentation=0, headline=None):
     for element in tree:

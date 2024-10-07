@@ -1,9 +1,19 @@
 import uuid
 
-from .org_rw import (Bold, Code, Headline, Italic, Line, RawLine, ListItem, Strike, Text,
-                     Underlined, Verbatim)
-
-from .org_rw import dump_contents
+from .org_rw import (
+    Bold,
+    Code,
+    Headline,
+    Italic,
+    Line,
+    ListItem,
+    RawLine,
+    Strike,
+    Text,
+    Underlined,
+    Verbatim,
+    dump_contents,
+)
 
 
 def get_hl_raw_contents(doc: Headline) -> str:

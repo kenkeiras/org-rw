@@ -2,8 +2,17 @@ import collections
 import unittest
 from datetime import datetime
 
-from org_rw import (Bold, Code, Italic, Line, Strike, Text, Underlined,
-                    Verbatim, get_raw_contents)
+from org_rw import (
+    Bold,
+    Code,
+    Italic,
+    Line,
+    Strike,
+    Text,
+    Underlined,
+    Verbatim,
+    get_raw_contents,
+)
 
 
 def timestamp_to_datetime(ts):
