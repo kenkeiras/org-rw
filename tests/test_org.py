@@ -903,8 +903,8 @@ class TestSerde(unittest.TestCase):
 
         # Update
         lines = list(doc.dump_headline(hl, recursive=False))
-        assert lines[0].startswith('* ')  # Title, skip it
-        content = '\n'.join(lines[1:])
+        assert lines[0].startswith("* ")  # Title, skip it
+        content = "\n".join(lines[1:])
         hl.update_raw_contents(content)
 
         # Check after update
@@ -914,7 +914,7 @@ class TestSerde(unittest.TestCase):
         with open(os.path.join(DIR, "13-update-reparse-test.org")) as f:
             doc = load(f)
 
-        expected_hl_contents = '''  :PROPERTIES:
+        expected_hl_contents = """  :PROPERTIES:
   :ID:       13-update-reparse-first-level-id
   :CREATED:  [2020-01-01 Wed 01:01]
   :END:
@@ -924,12 +924,12 @@ class TestSerde(unittest.TestCase):
     - With a sublist
 
   Something after the list.
-'''
+"""
 
         hl = doc.getTopHeadlines()[0]
         lines = list(doc.dump_headline(hl, recursive=False))
-        assert lines[0].startswith('* ')  # Title, skip it
-        content = '\n'.join(lines[1:])
+        assert lines[0].startswith("* ")  # Title, skip it
+        content = "\n".join(lines[1:])
         self.assertEqual(content, expected_hl_contents)
 
         # Check after update
@@ -937,17 +937,17 @@ class TestSerde(unittest.TestCase):
         self.assertEqual(content, expected_hl_contents)
 
         # Check after dump and reload
-        with tempfile.NamedTemporaryFile('wt') as f:
+        with tempfile.NamedTemporaryFile("wt") as f:
             save = org_rw.dumps(doc)
             f.write(save)
             f.flush()
 
-            with open(f.name, 'rt') as reader:
+            with open(f.name, "rt") as reader:
                 reloaded = org_rw.load(reader)
                 re_hl = reloaded.getTopHeadlines()[0]
                 lines = list(doc.dump_headline(hl, recursive=False))
-                assert lines[0].startswith('* ')  # Title, skip it
-                content = '\n'.join(lines[1:])
+                assert lines[0].startswith("* ")  # Title, skip it
+                content = "\n".join(lines[1:])
                 self.assertEqual(content, expected_hl_contents)
 
     def test_mimic_write_file_13(self):

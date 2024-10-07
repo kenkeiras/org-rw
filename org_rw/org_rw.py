@@ -1,4 +1,5 @@
 from __future__ import annotations
+
 import collections
 import difflib
 import logging
@@ -7,7 +8,6 @@ import re
 import sys
 from datetime import date, datetime, timedelta
 from enum import Enum
-
 from typing import (
     Dict,
     Iterator,
@@ -860,7 +860,9 @@ class Headline:
         # No need to finalize as we can take the data from the reader instead of from a doc
         if len(reader.headlines) > 0:
             # Probably can be done by just adding the headlines to this one's children
-            raise NotImplementedError('new headlines on raw contents not supported yet. This probably should be simple, see comment on code.')
+            raise NotImplementedError(
+                "new headlines on raw contents not supported yet. This probably should be simple, see comment on code."
+            )
 
         for kw in reader.keywords:
             self.keywords.append(offset_linenum(self.start_line + 1, kw))
@@ -878,7 +880,6 @@ class Headline:
             self.properties.append(offset_linenum(self.start_line + 1, prop))
 
         # Environment is not used, as it's known
-
 
     def get_element_in_line(self, linenum):
         for line in self.contents:
@@ -1077,9 +1078,7 @@ Keyword = collections.namedtuple(
 Property = collections.namedtuple(
     "Property", ("linenum", "match", "key", "value", "options")
 )
-Structural = collections.namedtuple(
-    "Structural", ("linenum", "line")
-)
+Structural = collections.namedtuple("Structural", ("linenum", "line"))
 
 
 class ListItem:
@@ -1129,13 +1128,16 @@ TableRow = collections.namedtuple(
 )
 
 ItemWithLineNum = Union[Keyword, RawLine, Property, ListItem, Structural]
+
+
 def offset_linenum(offset: int, item: ItemWithLineNum) -> ItemWithLineNum:
     if isinstance(item, ListItem):
         item.linenum += offset
         return item
 
-    assert isinstance(item, (Keyword, RawLine, Property, Structural)), \
-        "Expected (Keyword|RawLine|Property|Structural), found {}".format(item)
+    assert isinstance(
+        item, (Keyword, RawLine, Property, Structural)
+    ), "Expected (Keyword|RawLine|Property|Structural), found {}".format(item)
     return item._replace(linenum=item.linenum + offset)
 
 

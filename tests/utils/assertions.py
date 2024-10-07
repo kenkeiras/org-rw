@@ -67,7 +67,12 @@ class HL:
         self.content = content
         self.children = children
 
-    def assert_matches(self, test_case: unittest.TestCase, doc, accept_trailing_whitespace_changes=False):
+    def assert_matches(
+        self,
+        test_case: unittest.TestCase,
+        doc,
+        accept_trailing_whitespace_changes=False,
+    ):
         test_case.assertEqual(self.title, get_raw(doc.title))
 
         # Check properties
@@ -85,7 +90,9 @@ class HL:
                     )
 
         if accept_trailing_whitespace_changes:
-            test_case.assertEqual(get_raw_contents(doc).rstrip(), self.get_raw().rstrip())
+            test_case.assertEqual(
+                get_raw_contents(doc).rstrip(), self.get_raw().rstrip()
+            )
         else:
             test_case.assertEqual(get_raw_contents(doc), self.get_raw())
 
