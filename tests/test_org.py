@@ -1036,6 +1036,75 @@ class TestSerde(unittest.TestCase):
         h1_2_h2 = h1_2.children[0]
         self.assertEqual(sorted(h1_2_h2.tags), ["otherh2tag"])
 
+    def test_update_headline_from_none_to_todo(self):
+        orig = "* First entry"
+        doc = loads(orig)
+        self.assertEqual(doc.headlines[0].is_todo, False)
+        self.assertEqual(doc.headlines[0].is_done, False)
+        self.assertEqual(doc.headlines[0].state, None)
+
+        doc.headlines[0].state = "TODO"
+        self.assertEqual(doc.headlines[0].is_todo, True)
+        self.assertEqual(doc.headlines[0].is_done, False)
+        self.assertEqual(doc.headlines[0].state["name"], "TODO")
+
+        self.assertEqual(dumps(doc), "* TODO First entry")
+
+    def test_update_headline_from_none_to_done(self):
+        orig = "* First entry"
+        doc = loads(orig)
+        self.assertEqual(doc.headlines[0].is_todo, False)
+        self.assertEqual(doc.headlines[0].is_done, False)
+        self.assertEqual(doc.headlines[0].state, None)
+
+        doc.headlines[0].state = org_rw.HeadlineState(name="DONE")
+        self.assertEqual(doc.headlines[0].is_todo, False)
+        self.assertEqual(doc.headlines[0].is_done, True)
+        self.assertEqual(doc.headlines[0].state["name"], "DONE")
+
+        self.assertEqual(dumps(doc), "* DONE First entry")
+
+    def test_update_headline_from_todo_to_none(self):
+        orig = "* TODO First entry"
+        doc = loads(orig)
+        self.assertEqual(doc.headlines[0].is_todo, True)
+        self.assertEqual(doc.headlines[0].is_done, False)
+        self.assertEqual(doc.headlines[0].state["name"], "TODO")
+
+        doc.headlines[0].state = None
+        self.assertEqual(doc.headlines[0].is_todo, False)
+        self.assertEqual(doc.headlines[0].is_done, False)
+        self.assertEqual(doc.headlines[0].state, None)
+
+        self.assertEqual(dumps(doc), "* First entry")
+
+    def test_update_headline_from_todo_to_done(self):
+        orig = "* TODO First entry"
+        doc = loads(orig)
+        self.assertEqual(doc.headlines[0].is_todo, True)
+        self.assertEqual(doc.headlines[0].is_done, False)
+        self.assertEqual(doc.headlines[0].state["name"], "TODO")
+
+        doc.headlines[0].state = "DONE"
+        self.assertEqual(doc.headlines[0].is_todo, False)
+        self.assertEqual(doc.headlines[0].is_done, True)
+        self.assertEqual(doc.headlines[0].state["name"], "DONE")
+        self.assertEqual(dumps(doc), "* DONE First entry")
+
+    def test_update_headline_from_done_to_todo(self):
+        orig = "* DONE First entry"
+        doc = loads(orig)
+        self.assertEqual(doc.headlines[0].is_todo, False)
+        self.assertEqual(doc.headlines[0].is_done, True)
+        self.assertEqual(doc.headlines[0].state["name"], "DONE")
+
+        doc.headlines[0].state = org_rw.HeadlineState(name="TODO")
+        self.assertEqual(doc.headlines[0].is_todo, True)
+        self.assertEqual(doc.headlines[0].is_done, False)
+        self.assertEqual(doc.headlines[0].state["name"], "TODO")
+
+        self.assertEqual(dumps(doc), "* TODO First entry")
+
 
 def print_tree(tree, indentation=0, headline=None):
     for element in tree:
