@@ -337,7 +337,7 @@ class Headline:
         self.priority = priority
         self.title_start = title_start
         self.title = parse_content_block([RawLine(linenum=start_line, line=title)])
-        self.state = state
+        self._state = state
         self.tags_start = tags_start
         self.shallow_tags = tags
         self.contents = contents
@@ -725,6 +725,42 @@ class Headline:
     @id.setter
     def id(self, value):
         self.set_property("ID", value)
+
+    @property
+    def state(self) -> HeadlineState:
+        return self._state
+
+    @state.setter
+    def state(self, new_state: Union[None, str, HeadlineState]) -> None:
+        """
+        Update the state of a Headline. If the state is a known one it will update it's TODO/DONE properties.
+
+        Args:
+            new_state (str|HeadlineState): New state, either it's literal value or it's structure.
+        """
+        if new_state is None:
+            self.is_todo = False
+            self.is_done = False
+            # TODO: Check & log if appropriate?
+            self._state = None
+            return
+
+        if isinstance(new_state, str):
+            new_state = HeadlineState(name=new_state)
+
+        state_name = new_state["name"]
+        if state_name in [kw["name"] for kw in self.doc.todo_keywords]:
+            self.is_todo = True
+            self.is_done = False
+            # TODO: Check & log if appropriate?
+        elif state_name in [kw["name"] for kw in self.doc.done_keywords]:
+            self.is_todo = False
+            self.is_done = True
+            # TODO: Check, log &  if appropriate?
+        else:
+            # TODO: Should we raise a warning, raise an exception, update the is_todo/is_done?
+            pass
+        self._state = new_state
 
     @property
     def clock(self):
@@ -2378,8 +2414,8 @@ class OrgDoc:
             tags = ":" + ":".join(headline.shallow_tags) + ":"
 
         state = ""
-        if headline.state:
-            state = headline.state["name"] + " "
+        if headline._state:
+            state = headline._state["name"] + " "
 
         raw_title = token_list_to_raw(headline.title.contents)
         tags_padding = ""
