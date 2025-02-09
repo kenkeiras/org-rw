@@ -9,8 +9,8 @@ jobs:
       - name: Check out repository code
         uses: actions/checkout@v3
       - run: apt-get update && apt-get install -y python3-pip
-      - run: pip install -e .
-      - run: pip install pytest
+      - run: pip install --break-system-package -e .
+      - run: pip install --break-system-package pytest
       - run: pytest
 
   mypy:
@@ -19,8 +19,8 @@ jobs:
       - name: Check out repository code
         uses: actions/checkout@v3
       - run: apt-get update && apt-get install -y python3-pip
-      - run: pip install -e .
-      - run: pip install mypy
+      - run: pip install --break-system-package -e .
+      - run: pip install --break-system-package mypy
       - run: mypy org_rw --check-untyped-defs
 
   style-formatting:
@@ -29,8 +29,8 @@ jobs:
       - name: Check out repository code
         uses: actions/checkout@v3
       - run: apt-get update && apt-get install -y python3-pip
-      - run: pip install -e .
-      - run: pip install black
+      - run: pip install --break-system-package -e .
+      - run: pip install --break-system-package black
       - run: black --check .
 
   style-sorted-imports:
@@ -39,8 +39,8 @@ jobs:
       - name: Check out repository code
         uses: actions/checkout@v3
       - run: apt-get update && apt-get install -y python3-pip
-      - run: pip install -e .
-      - run: pip install isort
+      - run: pip install --break-system-package -e .
+      - run: pip install --break-system-package isort
       - run: isort --profile black --check .
 
   stability-extra-test:
@@ -49,5 +49,5 @@ jobs:
     - name: Check out repository code
       uses: actions/checkout@v3
     - run: apt-get update && apt-get install -y git-core python3-pip
-    - run: pip install -e .
+    - run: pip install --break-system-package -e .
     - run: bash extra-tests/check_all.sh
