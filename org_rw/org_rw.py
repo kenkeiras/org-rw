@@ -872,9 +872,24 @@ class Headline:
                 yield from get_links_from_content(item.content)
 
     def get_lines_between(self, start, end):
-        for line in self.contents:
+        # @TODO: Generalize for other line types too.
+        everything = (
+            []
+            # + self.keywords
+            + self.contents
+            # + self.list_items
+            # + self.table_rows
+            # + self.properties
+            # + self.structural
+            + self.delimiters
+        )
+
+        for line in everything:
             if start <= line.linenum < end:
-                yield "".join(line.get_raw())
+                if 'get_raw' in dir(line):
+                    yield "".join(line.get_raw())
+                else:
+                    yield line.line
 
     def get_contents(self, format):
         if format == "raw":
