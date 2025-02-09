@@ -2307,6 +2307,7 @@ class OrgDoc:
         list_items,
         structural,
         properties,
+        delimiters,
         environment=BASE_ENVIRONMENT,
     ):
         self.todo_keywords = [HeadlineState(name=kw) for kw in DEFAULT_TODO_KEYWORDS]
@@ -2336,6 +2337,7 @@ class OrgDoc:
         self.list_items: List[ListItem] = list_items
         self.structural: List = structural
         self.properties: List = properties
+        self.delimiters: List = delimiters
         self._path = None
         self.headlines: List[Headline] = list(
             map(lambda hl: parse_headline(hl, self, self), headlines)
@@ -2500,6 +2502,9 @@ class OrgDoc:
         for struct in self.structural:
             lines.append(dump_structural(struct))
 
+        for content in self.delimiters:
+            lines.append(dump_delimiters(content))
+
         for kw in self.keywords:
             lines.append(dump_kw(kw))
 
@@ -2537,6 +2542,7 @@ class OrgDocReader:
             self.list_items,
             self.structural,
             self.properties,
+            self.delimiters,
             self.environment,
         )
 
