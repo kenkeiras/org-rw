@@ -7,6 +7,7 @@ from .org_rw import (
     Italic,
     Line,
     ListItem,
+    TableRow,
     RawLine,
     Strike,
     Text,
@@ -49,6 +50,8 @@ def get_raw_contents(doc) -> str:
     if isinstance(doc, (Text, Bold, Code, Italic, Strike, Underlined, Verbatim)):
         return doc.get_raw()
     if isinstance(doc, ListItem):
+        return dump_contents(doc)[1]
+    if isinstance(doc, TableRow):
         return dump_contents(doc)[1]
     print("Unhandled type: " + str(doc))
     raise NotImplementedError("Unhandled type: " + str(doc))

@@ -70,11 +70,18 @@ class TableSeparatorRow:
     def __init__(self, orig=None):
         self.orig = orig
 
+    def get_raw(self):
+        return get_raw_contents(self.orig)
+
 
 class TableRow:
     def __init__(self, cells, orig=None):
         self.cells = cells
         self.orig = orig
+
+    def get_raw(self):
+        return get_raw_contents(self.orig)
+
 
 
 class Text:
