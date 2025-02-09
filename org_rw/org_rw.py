@@ -122,6 +122,7 @@ NON_FINISHED_GROUPS = (
     dom.ListGroupNode,
     dom.ResultsDrawerNode,
     dom.PropertyDrawerNode,
+    dom.GenericDrawerNode,
 )
 FREE_GROUPS = (dom.CodeBlock,)
 
@@ -635,6 +636,13 @@ class Headline:
                 elif content.strip().upper() == ":RESULTS:":
                     assert current_node is None
                     current_node = dom.ResultsDrawerNode()
+
+                    # TODO: Allow indentation of these blocks inside others
+                    indentation_tree = [current_node]
+                    tree.append(current_node)
+                elif content.strip().startswith(':') and content.strip().endswith(':'):
+                    assert current_node is None
+                    current_node = dom.GenericDrawerNode(content.strip().strip(':'))
 
                     # TODO: Allow indentation of these blocks inside others
                     indentation_tree = [current_node]

@@ -24,6 +24,14 @@ class ResultsDrawerNode(DrawerNode):
         return "<Results: {}>".format(len(self.children))
 
 
+class GenericDrawerNode(DrawerNode):
+    def __init__(self, drawer_name):
+        self.drawer_name = drawer_name
+
+    def __repr__(self):
+        return "<Drawer{}: {}>".format(self.drawer_name, len(self.children))
+
+
 class PropertyNode:
     def __init__(self, key, value):
         self.key = key
