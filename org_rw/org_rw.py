@@ -415,6 +415,7 @@ class Headline:
                 if (
                     isinstance(line, DelimiterLine)
                     and line.delimiter_type == DelimiterLineType.END_BLOCK
+                    and line.type_data.subtype == current_node.header.type_data.subtype
                 ):
 
                     start = current_node.header.linenum
