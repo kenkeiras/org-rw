@@ -605,7 +605,7 @@ class Headline:
                     tree.append(current_node)
                     # TODO: Check if this can be nested
                     indentation_tree = [current_node]
-                elif content.strip().upper() == ":LOGBOOK:":
+                elif content.strip().upper() in (":LOGBOOK:", ":RELATED:", ":SOURCE:", ":TEMPLATE:"):
                     assert current_node is None
                     current_node = dom.LogbookDrawerNode()
                     tree.append(current_node)
