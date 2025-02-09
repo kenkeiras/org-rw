@@ -83,7 +83,6 @@ class TableRow:
         return get_raw_contents(self.orig)
 
 
-
 class Text:
     def __init__(self, content):
         self.content = content

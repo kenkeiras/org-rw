@@ -641,9 +641,9 @@ class Headline:
                     # TODO: Allow indentation of these blocks inside others
                     indentation_tree = [current_node]
                     tree.append(current_node)
-                elif content.strip().startswith(':') and content.strip().endswith(':'):
+                elif content.strip().startswith(":") and content.strip().endswith(":"):
                     assert current_node is None
-                    current_node = dom.GenericDrawerNode(content.strip().strip(':'))
+                    current_node = dom.GenericDrawerNode(content.strip().strip(":"))
 
                     # TODO: Allow indentation of these blocks inside others
                     indentation_tree = [current_node]
@@ -887,7 +887,7 @@ class Headline:
 
         for line in everything:
             if start <= line.linenum < end:
-                if 'get_raw' in dir(line):
+                if "get_raw" in dir(line):
                     yield "".join(line.get_raw())
                 else:
                     yield line.line
